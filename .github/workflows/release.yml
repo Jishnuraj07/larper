@@ -4,9 +4,10 @@ name: Release
 # Windows installers, have SignPath sign them, and open a draft GitHub release
 # with the signed files. Review the draft, write the notes, then publish it.
 #
-# Needs, from the SignPath project (see .signpath/README.md):
+# Signing needs, from the SignPath project (see .signpath/README.md):
 #   secret   SIGNPATH_API_TOKEN
 #   variable SIGNPATH_ORGANIZATION_ID
+# Until those exist, the draft gets the unsigned installers instead.
 on:
   push:
     tags: ["v*"]
@@ -48,6 +49,7 @@ jobs:
 
   sign-and-release:
     needs: build
+    if: vars.SIGNPATH_ORGANIZATION_ID != ''
     runs-on: ubuntu-latest
     steps:
       # The release-signing policy needs a manual approval in SignPath; the job waits up to an hour for it.
@@ -79,3 +81,29 @@ jobs:
           } > notes.md
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
             --title "Larper ${GITHUB_REF_NAME#v}" --notes-file notes.md *.exe
+
+  release-unsigned:
+    needs: build
+    if: vars.SIGNPATH_ORGANIZATION_ID == ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: unsigned
+          path: unsigned
+      - name: Draft the release with the unsigned files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd unsigned
+          sha256sum -b *.exe > SHA256SUMS.txt
+          {
+            echo "Unsigned builds for ${GITHUB_REF_NAME}: Windows SmartScreen will warn before running them. Replace this with the release notes before publishing."
+            echo
+            echo '## Checksums (SHA-256)'
+            echo
+            echo '```'
+            cat SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft             --title "Larper ${GITHUB_REF_NAME#v}" --notes-file notes.md *.exe SHA256SUMS.txt
