@@ -121,5 +121,6 @@ export const starship: Theme = {
     done: ["Engineering reports the assignment complete.", "Assignment complete. Log entry ends."],
   },
   colors: { accent: "#ffb347", signal: "#6ec6ff", danger: "#ff5c5c", banner: ["#e6f0ff", "#b8d8ff", "#6ec6ff", "#4a90e2", "#2f5fbf"] },
+  flair: "★ · ✦ · 🚀 · ✦ · ★",
   spinner: "arc",
 };

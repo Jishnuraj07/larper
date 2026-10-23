@@ -73,6 +73,8 @@ The desktop app has the same crew in a window. It has the crew chat, an arena wh
 - **Starship:** a starfield and console panels.
 - **Hustle:** a bright, white-card professional feed.
 
+Each theme also has its own motion: code rain, rising golden motes, torch embers, warp streaks or floating reactions in the background. Hits, wins, achievements and rank-ups set off themed particle bursts, a window flash and a toast. All of it turns off when the system asks for reduced motion.
+
 The agent, the game and your progress are shared with the terminal version.
 
 ```sh

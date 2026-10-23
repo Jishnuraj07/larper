@@ -98,6 +98,111 @@ function line(cls, text) {
   return append(el("div", cls, text));
 }
 
+// ---------- effects ----------
+
+/**
+ * Each theme's flourishes: what drifts in the background, and what flies out
+ * when something happens. Colours come from the theme's palette in style.css.
+ */
+const FX = {
+  netrunner: { rain: "01アイウエオカキクケコサシスセソ<>/#$%", burst: ["0", "1", "█", "▓", "░", "<", ">", "#"], win: ["◆", "▲", "■", "0", "1", "✚"] },
+  olympus: { rain: "✦✧⋆·", burst: ["⚡", "✦", "✧", "☀"], win: ["✦", "⚡", "🏛", "🍇", "✧"] },
+  dungeon: { rain: "•·✦", burst: ["✦", "⚔", "✨", "🪙"], win: ["🪙", "💎", "✨", "🏆", "🪙"] },
+  starship: { rain: "", burst: ["✦", "✧", "•", "+"], win: ["★", "✦", "🚀", "✧"] },
+  hustle: { rain: "👍💡🎉📈🚀✨💼🙌", burst: ["👍", "💯", "✅", "✨"], win: ["🎉", "🎊", "👏", "🚀", "💯"], confetti: true },
+};
+const PALETTE = ["var(--neon)", "var(--acid)", "var(--text)", "var(--crew-fx, var(--neon))"];
+const pickOne = (list) => list[Math.floor(Math.random() * list.length)];
+const fx = () => FX[T().id] ?? FX.netrunner;
+
+/** Refill the background layer for the current theme. */
+function fillAmbient() {
+  const host = $("ambient");
+  host.replaceChildren();
+  if (calm()) return;
+  const set = fx();
+  const count = T().id === "starship" ? 34 : 26;
+  for (let i = 0; i < count; i++) {
+    const p = el("i");
+    if (T().id === "netrunner") {
+      // A column of falling code.
+      p.textContent = Array.from({ length: 6 + Math.floor(Math.random() * 10) }, () => pickOne(set.rain)).join("");
+    } else if (set.rain) {
+      p.textContent = pickOne([...set.rain]);
+    }
+    const dur = 7 + Math.random() * 14;
+    p.style.setProperty("--x", `${Math.random() * 100}%`);
+    p.style.setProperty("--y", `${Math.random() * 100}%`);
+    p.style.setProperty("--dur", `${dur.toFixed(1)}s`);
+    p.style.setProperty("--delay", `${(-Math.random() * dur).toFixed(1)}s`);
+    p.style.setProperty("--size", `${(0.7 + Math.random() * 0.9).toFixed(2)}`);
+    host.appendChild(p);
+  }
+}
+
+/** Throw particles out from the middle of `origin` (an element). */
+function burst(kind, origin, count = 18) {
+  if (calm() || !origin) return;
+  const r = origin.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const set = fx();
+  const glyphs = kind === "win" || kind === "rank" ? set.win : set.burst;
+  for (let i = 0; i < count; i++) {
+    const confetti = set.confetti && Math.random() < 0.55;
+    const p = el("span", confetti ? "p confetti" : "p", confetti ? "" : pickOne(glyphs));
+    const angle = Math.random() * Math.PI * 2;
+    const dist = (kind === "win" || kind === "rank" ? 140 : 80) + Math.random() * 120;
+    p.style.left = `${cx}px`;
+    p.style.top = `${cy}px`;
+    p.style.setProperty("--dx", `${Math.cos(angle) * dist}px`);
+    p.style.setProperty("--dy", `${Math.sin(angle) * dist - 40}px`);
+    p.style.setProperty("--rot", `${Math.round(Math.random() * 720 - 360)}deg`);
+    p.style.setProperty("--dur", `${(0.7 + Math.random() * 0.7).toFixed(2)}s`);
+    p.style.color = pickOne(PALETTE);
+    if (confetti) p.style.background = pickOne(["var(--neon)", "var(--acid)", "var(--wound)", "#f5c542"]);
+    p.addEventListener("animationend", () => p.remove());
+    $("fx").appendChild(p);
+  }
+}
+
+/** A full-window flash in the theme's style: "hit", "grow" or "win". */
+function flash(kind) {
+  if (calm()) return;
+  const f = $("flash");
+  f.dataset.kind = kind;
+  f.classList.remove("go");
+  void f.offsetWidth;
+  f.classList.add("go");
+}
+
+function shake(node) {
+  if (calm()) return;
+  node.classList.remove("shake");
+  void node.offsetWidth;
+  node.classList.add("shake");
+}
+
+let toastTimer = 0;
+
+/** The achievement toast, top right. */
+function toast(hack) {
+  const t = $("toast");
+  t.replaceChildren();
+  t.appendChild(icon("unlock"));
+  const body = el("div");
+  body.appendChild(el("span", "toast-eyebrow", `${cap(T().words.achievement)} unlocked`));
+  body.appendChild(el("strong", "", hack.title));
+  t.appendChild(body);
+  t.appendChild(el("span", "gain", `+${hack.reward}`));
+  t.hidden = false;
+  t.classList.remove("in");
+  void t.offsetWidth;
+  t.classList.add("in");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), 3600);
+}
+
 // ---------- the crew speaking ----------
 
 const SCRAMBLE = "▓▒░█<>/\\|_-=+*#%01";
@@ -276,6 +381,8 @@ function renderArena(boss, change) {
     $("foe-name").textContent = `${boss?.name ?? cap(T().words.foe)} ${T().words.defeated}`;
     $("foe-hp").textContent = "All tests pass";
     pulseArena("won");
+    burst("win", $("arena"), 40);
+    flash("win");
     setTimeout(() => {
       if (state.boss) return; // a new fight began meanwhile
       a.classList.remove("won");
@@ -296,6 +403,13 @@ function renderArena(boss, change) {
   $("foe-name").textContent = boss.name;
   $("foe-hp").textContent = `${boss.hp} of ${boss.maxHp} test${boss.maxHp === 1 ? "" : "s"} failing`;
   if (change === "hit" || change === "grow") pulseArena(change);
+  if (change === "hit") {
+    burst("hit", $("arena"));
+    flash("hit");
+  } else if (change === "grow") {
+    flash("grow");
+    shake($("arena"));
+  }
 }
 
 function renderTools() {
@@ -331,6 +445,7 @@ function applyTheme() {
     $("empty-sub").textContent = t.lines.emptySub;
   }
   document.title = `Larper · ${t.name}`;
+  fillAmbient();
 }
 
 function renderAll() {
@@ -396,6 +511,7 @@ const handlers = {
     state.xp = total;
     renderRank();
     floatXp(amount);
+    if (amount > 0) burst("hit", $("xp-label"), 6);
     if (amount < 0) line("event foe", `${T().lines.regression} ${amount} ${T().words.xp}.`);
   },
   hack(hack) {
@@ -410,10 +526,14 @@ const handlers = {
     row.appendChild(text);
     row.appendChild(el("span", "gain", `+${hack.reward}`));
     append(row);
+    toast(hack);
+    burst("win", $("toast"), 16);
   },
   rank_up({ rank }) {
     $("upgrade-rank").textContent = rank;
     $("upgrade").hidden = false;
+    flash("win");
+    requestAnimationFrame(() => burst("rank", document.querySelector(".upgrade-mark"), 60));
     setTimeout(() => ($("upgrade").hidden = true), 3200);
   },
   theme() {
@@ -421,6 +541,10 @@ const handlers = {
   },
   boss({ boss, change }) {
     if (state.serious || !boss || change === "none") return;
+    if (change === "spawn") {
+      flash("grow");
+      shake(document.querySelector(".frame"));
+    }
     state.boss = change === "defeated" ? null : boss;
     renderArena(boss, change);
     const l = T().lines;

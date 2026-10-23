@@ -128,5 +128,6 @@ export const hustle: Theme = {
     done: ["Ticket closed. What's one thing you shipped today?", "Another deliverable shipped. Blessed."],
   },
   colors: { accent: "#3d8bfd", signal: "#1f9d55", danger: "#d64545", banner: ["#8fc1ff", "#6aa8ff", "#3d8bfd", "#2a6fd6", "#1d56ad"] },
+  flair: "🎉 👏 🚀 💯 🚀 👏 🎉",
   spinner: "dots",
 };

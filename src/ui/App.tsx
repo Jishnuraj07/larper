@@ -6,7 +6,7 @@ import type { Boss, Hack } from "../events.js";
 import type { ApprovalRequest } from "../agent/tools.js";
 import type { ApprovalAnswer, Session } from "../session.js";
 import { fill, theme } from "../theme/index.js";
-import { Banner, BossBar, CrewBubble, HackCard, GatePrompt, RankUp, StatusBar, ToolLine, Working } from "./components.js";
+import { Banner, BossBar, Flair, CrewBubble, HackCard, GatePrompt, RankUp, StatusBar, ToolLine, Working } from "./components.js";
 
 type Entry =
   | { id: number; kind: "banner" }
@@ -19,7 +19,7 @@ type Entry =
   | { id: number; kind: "xp"; amount: number; reason: string }
   | { id: number; kind: "hack"; hack: Hack }
   | { id: number; kind: "rank"; rank: string }
-  | { id: number; kind: "boss"; text: string };
+  | { id: number; kind: "boss"; text: string; won?: boolean };
 
 type NewEntry = Entry extends infer E ? (E extends Entry ? Omit<E, "id"> : never) : never;
 
@@ -88,7 +88,16 @@ function EntryView({ e }: { e: Entry }) {
     case "rank":
       return <RankUp rank={e.rank} />;
     case "boss":
-      return (
+      return e.won ? (
+        <Box flexDirection="column">
+          <Flair />
+          <Text color={t.colors.signal} bold>
+            {"  "}
+            {e.text}
+          </Text>
+          <Flair />
+        </Box>
+      ) : (
         <Text color={t.colors.danger} bold>
           {"  "}
           {e.text}
@@ -183,7 +192,7 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
           hit: [icons.hit, lines.foeHit],
           defeated: [icons.won, lines.foeDefeated],
         }[change];
-        add({ kind: "boss", text: `${icon} ${fill(line, { foe: bs.name, n: bs.hp })}` });
+        add({ kind: "boss", text: `${icon} ${fill(line, { foe: bs.name, n: bs.hp })}`, won: change === "defeated" });
       }),
     ];
     session.setApprovalHandler(

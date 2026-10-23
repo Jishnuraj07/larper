@@ -1528,3 +1528,584 @@ body.no-anim *::before {
   letter-spacing: 0.01em;
   font-family: var(--display-face);
 }
+
+/* ======================================================================
+ * Flash: ambience, bursts, flashes and the toast. All decorative, all
+ * pointer-events: none, all off under reduced motion and in screenshots.
+ * ====================================================================== */
+
+.bar,
+.frame {
+  position: relative;
+  z-index: 1;
+}
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient i {
+  position: absolute;
+  left: var(--x);
+  top: 0;
+  font-style: normal;
+  font-size: calc(14px * var(--size));
+  line-height: 1;
+  will-change: transform, opacity;
+  animation: var(--amb-anim, fall) var(--dur) linear var(--delay) infinite;
+}
+
+/* Netrunner: cyan code rain. */
+:root[data-theme="netrunner"] .ambient i {
+  writing-mode: vertical-rl;
+  font-family: var(--mono-face);
+  letter-spacing: 0.15em;
+  color: var(--acid);
+  opacity: 0.16;
+  text-shadow: 0 0 8px var(--acid);
+  --amb-anim: fall;
+}
+
+@keyframes fall {
+  from {
+    transform: translateY(-40vh);
+  }
+  to {
+    transform: translateY(115vh);
+  }
+}
+
+/* Olympus: golden motes rising and twinkling. */
+:root[data-theme="olympus"] .ambient i {
+  color: var(--neon);
+  text-shadow: 0 0 10px var(--neon), 0 0 22px rgb(var(--neon-rgb) / 0.6);
+  --amb-anim: rise;
+}
+
+@keyframes rise {
+  0% {
+    transform: translateY(105vh) scale(0.8);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.25;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-10vh) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Dungeon: embers off a torch, swaying as they climb. */
+:root[data-theme="dungeon"] .ambient i {
+  color: #ff9a3d;
+  text-shadow: 0 0 6px #ff7a1f, 0 0 16px rgb(255 122 31 / 0.7);
+  --amb-anim: ember;
+}
+
+@keyframes ember {
+  0% {
+    transform: translate(0, 105vh);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  30% {
+    transform: translate(24px, 75vh);
+  }
+  55% {
+    transform: translate(-18px, 45vh);
+    opacity: 0.6;
+  }
+  80% {
+    transform: translate(14px, 20vh);
+  }
+  100% {
+    transform: translate(-8px, -5vh);
+    opacity: 0;
+  }
+}
+
+/* Starship: stars streaking past at warp. */
+:root[data-theme="starship"] .ambient i {
+  top: var(--y);
+  left: 0;
+  width: calc(60px * var(--size));
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgb(230 240 255 / 0.85));
+  box-shadow: 0 0 6px rgb(var(--acid-rgb) / 0.6);
+  --amb-anim: warp;
+  animation-duration: calc(var(--dur) / 3);
+}
+
+@keyframes warp {
+  from {
+    transform: translateX(110vw) scaleX(0.4);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  to {
+    transform: translateX(-20vw) scaleX(1.6);
+    opacity: 0;
+  }
+}
+
+/* Hustle: reactions floating up the feed. */
+:root[data-theme="hustle"] .ambient i {
+  font-size: calc(18px * var(--size));
+  --amb-anim: bubble;
+}
+
+@keyframes bubble {
+  0% {
+    transform: translateY(105vh) scale(0.6) rotate(-10deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(-10vh) scale(1.15) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+/* ---------- particles ---------- */
+
+.fx {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fx .p {
+  position: absolute;
+  font: 700 18px var(--mono-face);
+  text-shadow: 0 0 10px currentColor;
+  transform: translate(-50%, -50%);
+  animation: fly var(--dur) cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+}
+
+.fx .p.confetti {
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  text-shadow: none;
+}
+
+@keyframes fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 90px)) scale(1.1) rotate(var(--rot));
+  }
+}
+
+/* ---------- flash ---------- */
+
+.flash {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.flash.go {
+  animation: flash 0.55s ease-out;
+}
+
+.flash[data-kind="hit"] {
+  background: var(--flash-hit);
+}
+
+.flash[data-kind="grow"] {
+  background: var(--flash-grow);
+}
+
+.flash[data-kind="win"] {
+  background: var(--flash-win);
+}
+
+@keyframes flash {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+:root {
+  /* Netrunner: a torn RGB band; a red alarm; a cyan surge. */
+  --flash-hit: linear-gradient(transparent 38%, rgb(var(--acid-rgb) / 0.22) 38% 41%, transparent 41% 58%, rgb(var(--wound-rgb) / 0.22) 58% 60%, transparent 60%);
+  --flash-grow: radial-gradient(circle at 50% 50%, transparent 40%, rgb(var(--wound-rgb) / 0.35));
+  --flash-win: radial-gradient(circle at 85% 30%, rgb(var(--acid-rgb) / 0.35), transparent 60%);
+}
+
+:root[data-theme="olympus"] {
+  /* A thunderbolt; the sky darkens; the sun breaks through. */
+  --flash-hit: linear-gradient(115deg, transparent 44%, rgb(255 255 255 / 0.55) 48%, rgb(var(--neon-rgb) / 0.4) 50%, transparent 54%);
+  --flash-grow: radial-gradient(circle, transparent 35%, rgb(12 16 34 / 0.75));
+  --flash-win: radial-gradient(circle at 50% 0%, rgb(var(--neon-rgb) / 0.45), transparent 65%);
+}
+
+:root[data-theme="dungeon"] {
+  /* A sword slash; blood on the stones; treasure light. */
+  --flash-hit: linear-gradient(135deg, transparent 47%, rgb(var(--wound-rgb) / 0.55) 49%, rgb(255 230 200 / 0.6) 50%, rgb(var(--wound-rgb) / 0.55) 51%, transparent 53%);
+  --flash-grow: radial-gradient(circle, transparent 30%, rgb(var(--wound-rgb) / 0.3));
+  --flash-win: radial-gradient(circle at 85% 30%, rgb(var(--neon-rgb) / 0.45), transparent 60%);
+}
+
+:root[data-theme="starship"] {
+  /* Shields ripple; red alert; all clear. */
+  --flash-hit: radial-gradient(circle at 85% 30%, transparent 10%, rgb(var(--acid-rgb) / 0.35) 12%, transparent 16%, rgb(var(--acid-rgb) / 0.2) 22%, transparent 26%);
+  --flash-grow: linear-gradient(rgb(var(--wound-rgb) / 0.3), transparent 20%, transparent 80%, rgb(var(--wound-rgb) / 0.3));
+  --flash-win: radial-gradient(circle at 85% 30%, rgb(123 224 166 / 0.4), transparent 60%);
+}
+
+:root[data-theme="hustle"] {
+  /* Bright and polite. */
+  --flash-hit: radial-gradient(circle at 85% 30%, rgb(var(--acid-rgb) / 0.18), transparent 50%);
+  --flash-grow: radial-gradient(circle, transparent 40%, rgb(var(--wound-rgb) / 0.15));
+  --flash-win: linear-gradient(120deg, rgb(var(--neon-rgb) / 0.18), rgb(245 197 66 / 0.18), rgb(var(--acid-rgb) / 0.18));
+}
+
+/* ---------- shake ---------- */
+
+.shake {
+  animation: shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes shake {
+  15%,
+  85% {
+    transform: translateX(-2px);
+  }
+  30%,
+  70% {
+    transform: translateX(4px);
+  }
+  45%,
+  60% {
+    transform: translateX(-5px);
+  }
+}
+
+/* ---------- wordmark, arena, titles ---------- */
+
+/* The wordmark runs a slow shimmer through the theme's two lead colours. */
+.wordmark {
+  background: linear-gradient(90deg, var(--neon), var(--acid), var(--neon)) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* Netrunner's wordmark also flickers like a failing tube. */
+:root[data-theme="netrunner"] .wordmark {
+  animation: shimmer 6s linear infinite, flicker 7s steps(1) infinite;
+}
+
+@keyframes flicker {
+  0%,
+  41%,
+  44%,
+  46%,
+  100% {
+    opacity: 1;
+  }
+  42%,
+  45% {
+    opacity: 0.35;
+  }
+}
+
+/* An orbit spins round the arena; faster and hotter mid-fight. */
+.arena::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px dashed var(--hair-hot);
+  animation: orbit 24s linear infinite;
+  pointer-events: none;
+}
+
+.arena.fighting::before {
+  border-color: var(--wound);
+  animation-duration: 5s;
+  box-shadow: 0 0 18px rgb(var(--wound-rgb) / 0.45), inset 0 0 18px rgb(var(--wound-rgb) / 0.25);
+}
+
+.arena::after {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(var(--neon-rgb) / 0.14), transparent 70%);
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
+.arena.fighting::after {
+  background: radial-gradient(circle, rgb(var(--wound-rgb) / 0.22), transparent 70%);
+  animation-duration: 1.1s;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes breathe {
+  50% {
+    transform: scale(1.08);
+    opacity: 0.6;
+  }
+}
+
+.arena.fighting .foe-name {
+  text-shadow: 0 0 14px rgb(var(--wound-rgb) / 0.7);
+  animation: menace 1.1s ease-in-out infinite;
+}
+
+@keyframes menace {
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.arena.won .foe-name {
+  text-shadow: 0 0 18px var(--ok);
+}
+
+.ring-hp {
+  color: var(--neon);
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.arena.fighting .ring-hp {
+  color: var(--wound);
+}
+
+/* The empty state's mark bobs. */
+.empty-mark {
+  animation: bob 4s ease-in-out infinite;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-8px) rotate(-4deg);
+  }
+}
+
+/* Achievement rows catch the light as they arrive. */
+.hack-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.hack-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.22) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: sheen 1.4s ease-out 0.2s;
+  pointer-events: none;
+}
+
+@keyframes sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  top: calc(var(--bar) + 14px);
+  right: calc(var(--rail) + 24px);
+  z-index: 31;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 260px;
+  padding: 12px 16px;
+  background: var(--raised);
+  border: 1px solid var(--acid);
+  clip-path: var(--cut);
+  color: var(--text);
+}
+
+.toast.in {
+  animation: toast 3.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.toast .ic {
+  width: 26px;
+  height: 26px;
+  color: var(--acid);
+  filter: drop-shadow(0 0 8px var(--acid));
+}
+
+.toast strong {
+  display: block;
+  font: 700 15px var(--display-face);
+  color: var(--acid);
+}
+
+.toast-eyebrow {
+  display: block;
+  font: 600 10.5px var(--mono-face);
+  letter-spacing: 0.16em;
+  text-transform: var(--caps);
+  color: var(--muted);
+}
+
+.toast .gain {
+  margin-left: auto;
+  font: 700 14px var(--mono-face);
+  color: var(--acid);
+}
+
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  8%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ---------- rank-up rays ---------- */
+
+.upgrade {
+  overflow: hidden;
+}
+
+.rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160vmax;
+  height: 160vmax;
+  margin: -80vmax 0 0 -80vmax;
+  background: repeating-conic-gradient(rgb(var(--neon-rgb) / 0.16) 0 8deg, transparent 8deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 0, transparent 45%);
+  mask: radial-gradient(circle, #000 0, transparent 45%);
+  animation: orbit 30s linear infinite;
+  pointer-events: none;
+}
+
+.upgrade > :not(.rays) {
+  position: relative;
+}
+
+.upgrade-mark {
+  animation: ascend 1.1s cubic-bezier(0.2, 0.8, 0.2, 1), bob 4s ease-in-out 1.1s infinite;
+}
+
+/* Olympus and Dungeon titles get a gilded, slowly moving fill. */
+:root:is([data-theme="olympus"], [data-theme="dungeon"]) :is(.upgrade-rank, .empty-title, .foe-name) {
+  background: linear-gradient(90deg, #fff3c4, var(--neon), #fff3c4) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 5s linear infinite;
+}
+
+:root:is([data-theme="olympus"], [data-theme="dungeon"]) .arena.fighting .foe-name {
+  background-image: linear-gradient(90deg, #ffd0c0, var(--wound), #ffd0c0);
+  animation: shimmer 5s linear infinite, menace 1.1s ease-in-out infinite;
+}
+
+/* Starship titles hum like a lit console. */
+:root[data-theme="starship"] :is(.upgrade-rank, .empty-title) {
+  text-shadow: 0 0 18px rgb(var(--neon-rgb) / 0.6);
+  animation: hum 2.4s ease-in-out infinite;
+}
+
+@keyframes hum {
+  50% {
+    text-shadow: 0 0 30px rgb(var(--neon-rgb) / 0.9), 0 0 6px rgb(var(--acid-rgb) / 0.8);
+  }
+}
+
+/* Hustle stays a bright feed: a gradient headline, no glow on particles. */
+:root[data-theme="hustle"] :is(.empty-title, .upgrade-rank) {
+  background: linear-gradient(90deg, var(--neon), #8a5cf6, var(--acid), var(--neon)) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 8s linear infinite;
+}
+
+:root[data-theme="hustle"] .fx .p,
+:root[data-theme="hustle"] .toast .ic {
+  text-shadow: none;
+  filter: none;
+}
+
+:root[data-theme="hustle"] .toast {
+  border-color: var(--hair);
+}
+
+/* No motion when the viewer asked for none, and none in smoke-test screenshots. */
+@media (prefers-reduced-motion: reduce) {
+  .ambient,
+  .fx,
+  .flash {
+    display: none;
+  }
+  *::after {
+    animation: none !important;
+  }
+}
+
+body.no-anim :is(.ambient, .fx, .flash) {
+  display: none;
+}
+
+body.no-anim *::after {
+  animation: none !important;
+}

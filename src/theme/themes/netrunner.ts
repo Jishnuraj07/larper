@@ -127,5 +127,6 @@ export const netrunner: Theme = {
     done: ["Fabricator powers down the rig. Job done.", "Job complete. Pirate Radio is putting it on the air."],
   },
   colors: { accent: "#fcee0a", signal: "#00f0ff", danger: "#ff003c", banner: ["#fcee0a", "#fcee0a", "#fcd20a", "#ff7a1f", "#ff003c"] },
+  flair: "▓▒░ ◆ ░▒▓ ◆ ▓▒░ ◆ ░▒▓",
   spinner: "binary",
 };

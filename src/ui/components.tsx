@@ -18,13 +18,22 @@ export const BANNER = [
   "|_____/_/   \_\_| \_\_|   |_____|_| \_\\",
 ];
 
+/** The banner in a diagonal sweep through the theme's five banner colours. */
 export function Banner({ serious }: { serious: boolean }) {
   const t = theme();
+  const width = BANNER[0].length;
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {BANNER.map((line, i) => (
-        <Text key={i} color={t.colors.banner[i]}>
-          {line}
+      {BANNER.map((line, row) => (
+        <Text key={row}>
+          {line.match(/.{1,4}/g)!.map((chunk, i) => {
+            const band = Math.min(4, Math.floor(((i * 4 + row * 3) / (width + 12)) * 5));
+            return (
+              <Text key={i} color={t.colors.banner[band]} bold>
+                {chunk}
+              </Text>
+            );
+          })}
         </Text>
       ))}
       <Text color={DIM}>
@@ -149,10 +158,26 @@ export function StatusBar({ xp, serious, sound, tts }: { xp: number; serious: bo
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
+/** A celebration line in the theme's glyphs, alternating its accent and signal colours. */
+export function Flair() {
+  const t = theme();
+  return (
+    <Text>
+      {"  "}
+      {t.flair.split(" ").map((g, i) => (
+        <Text key={i} color={i % 2 ? t.colors.signal : t.colors.accent} bold>
+          {g}{" "}
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
 export function HackCard({ hack }: { hack: Hack }) {
   const t = theme();
   return (
     <Box borderStyle="double" borderColor={t.colors.signal} paddingX={1} marginTop={1} flexDirection="column">
+      <Flair />
       <Text color={t.colors.signal} bold>
         {t.icons.unlock} {cap(t.words.achievement)} unlocked: {hack.title}
       </Text>
@@ -169,10 +194,12 @@ export function HackCard({ hack }: { hack: Hack }) {
 export function RankUp({ rank }: { rank: string }) {
   const t = theme();
   return (
-    <Box borderStyle="bold" borderColor={t.colors.accent} paddingX={2} marginTop={1} justifyContent="center">
+    <Box borderStyle="bold" borderColor={t.colors.accent} paddingX={2} marginTop={1} flexDirection="column" alignItems="center">
+      <Flair />
       <Text color={t.colors.accent} bold>
         {fill(t.lines.rankUp, { rank })}
       </Text>
+      <Flair />
     </Box>
   );
 }

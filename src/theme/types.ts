@@ -99,6 +99,8 @@ export interface Theme {
   narration: Record<NarrationKind, string[]>;
   /** Terminal colours. The desktop app has its own palette per theme in style.css. */
   colors: { accent: string; signal: string; danger: string; banner: [string, string, string, string, string] };
+  /** A celebration line for wins, achievements and rank-ups in the terminal. */
+  flair: string;
   /** An ink-spinner (cli-spinners) name for the working line. */
   spinner: "binary" | "star" | "dots" | "arc" | "bouncingBar" | "toggle" | "moon" | "line" | "squareCorners";
 }

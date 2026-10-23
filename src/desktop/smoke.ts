@@ -27,6 +27,8 @@ export async function runDesktopSmoke({ win, session, shotsDir }: { win: Browser
     // A hidden window only repaints on demand; ask for a fresh frame first.
     win.webContents.invalidate();
     await sleep(300);
+    win.webContents.invalidate();
+    await sleep(300);
     const image = await win.webContents.capturePage();
     fs.writeFileSync(path.join(shotsDir, `${name}.png`), image.toPNG());
   };
@@ -93,12 +95,22 @@ export async function runDesktopSmoke({ win, session, shotsDir }: { win: Browser
   // Every theme restyles the window and renames what is on it, progress and all.
   const start = t.id;
   for (const id of [...Object.keys(THEMES).filter((k) => k !== start), start]) {
+    // Animations on before the switch, so the theme fills its ambience.
+    await js(`document.body.classList.remove("no-anim")`);
     await send(`/theme ${id}`);
     await sleep(700);
     const applied = await js<string>("document.documentElement.dataset.theme");
     const rank = await js<string>(`document.getElementById("rank-name").textContent`);
     checks.push([`switched to ${id}`, applied === id && rank === THEMES[id as keyof typeof THEMES].ranks[1].name]);
+    // Show the theme's effects mid-flight: a hit on a foe and an achievement toast.
+    const foe = { name: theme().threats[2], tier: 2, hp: 2, maxHp: 5, startHp: 5 };
+    session.bus.emit("boss", { boss: foe, change: "hit" });
+    session.bus.emit("hack", hack("uptime"));
+    await sleep(1200); // the hidden window repaints late; give the effects a frame
     await shot(`5-theme-${id}`);
+    session.bus.emit("boss", { boss: { ...foe, hp: 0 }, change: "defeated" });
+    await sleep(500);
+    await js(`document.body.classList.add("no-anim")`);
   }
   checks.push(["no renderer errors", errors.length === 0]);
   for (const e of errors) console.log(`renderer error: ${e}`);

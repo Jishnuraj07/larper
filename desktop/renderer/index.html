@@ -25,9 +25,12 @@
       </defs>
     </svg>
 
+    <!-- Theme ambience behind everything: code rain, golden motes, embers, star streaks, reactions. -->
+    <div id="ambient" class="ambient" aria-hidden="true"></div>
+
     <header class="bar">
       <img class="mark" src="../icon.svg" alt="" />
-      <span class="wordmark">Larper</span>
+      <span class="wordmark" data-text="Larper">Larper</span>
       <span id="demo-badge" class="demo" hidden>Demo</span>
       <button id="project" class="project" title="Choose another project folder">
         <svg class="ic"><use href="#i-folder" /></svg><span id="project-path">…</span>
@@ -122,7 +125,13 @@
       </div>
     </div>
 
+    <!-- Event effects: particle bursts, a full-window flash, and the achievement toast. -->
+    <div id="fx" class="fx" aria-hidden="true"></div>
+    <div id="flash" class="flash" aria-hidden="true"></div>
+    <div id="toast" class="toast" role="status" hidden></div>
+
     <div id="upgrade" class="upgrade" hidden>
+      <div class="rays" aria-hidden="true"></div>
       <img class="upgrade-mark" src="../icon.svg" alt="" />
       <p id="upgrade-rank" class="upgrade-rank"></p>
       <p id="upgrade-sub" class="upgrade-sub"></p>

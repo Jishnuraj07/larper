@@ -16,6 +16,7 @@ describe("themes", () => {
     expect(Object.keys(t.crew).sort()).toEqual(["builder", "critic", "narrator", "planner"]);
     for (const kind of Object.keys(THEMES.netrunner.narration)) expect(t.narration[kind as keyof typeof t.narration].length).toBeGreaterThan(0);
     for (const [key, line] of Object.entries(t.lines)) expect(line, key).toBeTruthy();
+    expect(t.flair.split(" ").length).toBeGreaterThan(2);
   });
 
   it("uses only placeholders that get filled", () => {

@@ -121,5 +121,6 @@ export const olympus: Theme = {
     done: ["The smith sets down his hammer. Another job done.", "Work complete. Hermes is off to tell everyone."],
   },
   colors: { accent: "#f2c14e", signal: "#5bc0eb", danger: "#e4572e", banner: ["#fff3c4", "#f7dc8a", "#f2c14e", "#e0a030", "#c07a18"] },
+  flair: "✦ ⚡ ✦ 🏛 ✦ ⚡ ✦",
   spinner: "star",
 };

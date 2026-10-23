@@ -121,5 +121,6 @@ export const dungeon: Theme = {
     done: ["The Artificer sets down the hammer. Quest step complete.", "Task complete. To the tavern!"],
   },
   colors: { accent: "#e8b04a", signal: "#6fcf97", danger: "#d64545", banner: ["#f6e2b3", "#eccb84", "#e8b04a", "#c98a35", "#9a5f26"] },
+  flair: "⚔ 🪙 ✨ 🏆 ✨ 🪙 ⚔",
   spinner: "moon",
 };
