@@ -2,16 +2,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, loadConfig } from "../src/config.js";
+import { DEFAULT_CONFIG, loadConfig, saveTheme } from "../src/config.js";
 import { emptyProfile, loadProfile, localDay, saveProfile } from "../src/game/profile.js";
 
 let home: string;
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), "ambrosia-config-"));
-  process.env.AMBROSIA_HOME = home;
+  home = fs.mkdtempSync(path.join(os.tmpdir(), "larper-config-"));
+  process.env.LARPER_HOME = home;
 });
 afterEach(() => {
-  delete process.env.AMBROSIA_HOME;
+  delete process.env.LARPER_HOME;
   fs.rmSync(home, { recursive: true, force: true });
 });
 
@@ -22,24 +22,40 @@ describe("loadConfig", () => {
   });
 
   it("merges a partial user config over the defaults", () => {
-    fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ sound: false, models: { blackice: "claude-opus-5-5" } }));
+    fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ sound: false, models: { critic: "claude-opus-5-5" } }));
     const c = loadConfig();
     expect(c.sound).toBe(false);
-    expect(c.models.blackice).toBe("claude-opus-5-5");
-    expect(c.models.fabricator).toBe(DEFAULT_CONFIG.models.fabricator);
+    expect(c.models.critic).toBe("claude-opus-5-5");
+    expect(c.models.builder).toBe(DEFAULT_CONFIG.models.builder);
     expect(c.effort).toEqual(DEFAULT_CONFIG.effort);
   });
 
-  it("carries over models and effort set under the old god names", () => {
+  it("carries over models and effort set under Ambrosia's crew names", () => {
     fs.writeFileSync(
       path.join(home, "config.json"),
-      JSON.stringify({ models: { hephaestus: "claude-sonnet-5-5", momus: "claude-haiku-4-5", blackice: "claude-opus-5-5" }, effort: { athena: "max" } }),
+      JSON.stringify({
+        models: { hephaestus: "claude-sonnet-5-5", momus: "claude-haiku-4-5", critic: "claude-opus-5-5", radio: "claude-sonnet-5-5" },
+        effort: { athena: "max", fabricator: "low" },
+      }),
     );
     const c = loadConfig();
-    expect(c.models.fabricator).toBe("claude-sonnet-5-5");
-    expect(c.models.blackice).toBe("claude-opus-5-5"); // the current key wins over the legacy one
-    expect(c.effort.strategos).toBe("max");
-    expect(Object.keys(c.models).sort()).toEqual(["blackice", "fabricator", "radio", "strategos"]);
+    expect(c.models.builder).toBe("claude-sonnet-5-5");
+    expect(c.models.critic).toBe("claude-opus-5-5"); // the current key wins over the legacy one
+    expect(c.models.narrator).toBe("claude-sonnet-5-5");
+    expect(c.effort.planner).toBe("max");
+    expect(c.effort.builder).toBe("low");
+    expect(Object.keys(c.models).sort()).toEqual(["builder", "critic", "narrator", "planner"]);
+    expect(c.theme).toBe("netrunner");
+  });
+
+  it("reads the theme by id or alias, and saveTheme keeps the rest of the file", () => {
+    fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ theme: "LinkedIn", sound: false }));
+    expect(loadConfig().theme).toBe("hustle");
+    saveTheme("dungeon");
+    const saved = JSON.parse(fs.readFileSync(path.join(home, "config.json"), "utf8"));
+    expect(saved).toEqual({ theme: "dungeon", sound: false });
+    fs.writeFileSync(path.join(home, "config.json"), JSON.stringify({ theme: "vaporwave" }));
+    expect(loadConfig().theme).toBe("netrunner");
   });
 
   it("survives a corrupt config file", () => {

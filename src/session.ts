@@ -3,15 +3,16 @@ import os from "node:os";
 import path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { Bus } from "./events.js";
-import { loadConfig, type Config } from "./config.js";
+import { loadConfig, saveTheme, type Config } from "./config.js";
 import { Agent, describeError } from "./agent/loop.js";
 import { READ_ONLY_TOOLS, type ApprovalRequest } from "./agent/tools.js";
 import { runHeist, runRoast, type Crew } from "./agent/council.js";
 import { GameEngine } from "./game/engine.js";
 import { loadProfile } from "./game/profile.js";
-import { HACKS } from "./game/hacks.js";
+import { allHacks } from "./game/hacks.js";
 import { progress } from "./game/ranks.js";
 import { streak } from "./game/profile.js";
+import { THEMES, fill, findTheme, setTheme, theme, type Theme } from "./theme/index.js";
 import { Narrator } from "./narrator.js";
 import { play } from "./audio/earcons.js";
 import { speak, stopSpeaking } from "./audio/tts.js";
@@ -23,6 +24,8 @@ export interface SessionOptions {
   serious?: boolean;
   mute?: boolean;
   yolo?: boolean;
+  /** A theme for this session only, by id, name or alias. Otherwise the one in config.json. */
+  theme?: string;
   /** Use this client instead of building one (the scripted demo, tests). */
   client?: Anthropic;
 }
@@ -54,6 +57,9 @@ export class Session {
     this.sound = this.config.sound && !opts.mute;
     this.tts = this.config.tts && !opts.mute;
     this.yolo = !!opts.yolo;
+    const asked = findTheme(opts.theme);
+    setTheme(asked?.id ?? this.config.theme);
+    if (opts.theme && !asked) queueMicrotask(() => this.bus.emit("notice", { text: `No theme called "${opts.theme}". ${themeList()}` }));
     for (const t of [...READ_ONLY_TOOLS, ...this.config.autoApprove]) this.alwaysAllow.add(t);
 
     if (opts.client) {
@@ -71,12 +77,12 @@ export class Session {
 
     if (this.client) {
       const approve = (req: ApprovalRequest) => this.approve(req);
-      const make = (crew: "fabricator" | "strategos" | "blackice", tools?: string[]) =>
+      const make = (crew: "builder" | "planner" | "critic", tools?: string[]) =>
         new Agent({ crew, client: this.client!, config: this.config, root: this.root, bus: this.bus, approve, tools });
       this.crew = {
-        fabricator: make("fabricator"),
-        strategos: make("strategos", READ_ONLY_TOOLS),
-        blackice: make("blackice", READ_ONLY_TOOLS),
+        builder: make("builder"),
+        planner: make("planner", READ_ONLY_TOOLS),
+        critic: make("critic", READ_ONLY_TOOLS),
       };
     }
 
@@ -93,6 +99,18 @@ export class Session {
         }),
       );
     }
+  }
+
+  get theme(): Theme {
+    return theme();
+  }
+
+  /** Dress the whole session in another theme: crew, game, narrator and UI. Progress carries over. */
+  switchTheme(next: Theme, persist = true): void {
+    setTheme(next.id);
+    this.engine.retheme();
+    if (persist) saveTheme(next.id);
+    this.bus.emit("theme", { id: next.id });
   }
 
   /** The UI registers how to ask the user. Requests are queued so prompts never overlap. */
@@ -137,7 +155,7 @@ export class Session {
     b.on("rank_up", sfx(() => play("rankup")));
     b.on("error", sfx(() => play("fail")));
     b.on("turn_end", (t) => {
-      if (t.crew === "fabricator" && t.stopReason === "end_turn") sfx(() => play("done"))();
+      if (t.crew === "builder" && t.stopReason === "end_turn") sfx(() => play("done"))();
     });
     b.on("narration", (n) => {
       if (this.tts && !this.serious) speak(n.text);
@@ -153,7 +171,7 @@ export class Session {
   private async task(fn: (p: Crew, signal: AbortSignal) => Promise<unknown>): Promise<void> {
     if (!this.crew) {
       this.bus.emit("error", {
-        message: "No uplink. Set ANTHROPIC_API_KEY (or run `ant auth login`) and restart.",
+        message: "No API access. Set ANTHROPIC_API_KEY (or run `ant auth login`) and restart.",
       });
       return;
     }
@@ -170,25 +188,27 @@ export class Session {
     }
   }
 
-  /** Handle one line of input: a slash command or a job for Fabricator. */
+  /** Handle one line of input: a slash command or a job for the builder. */
   async submit(line: string): Promise<"quit" | void> {
     const text = line.trim();
     if (!text) return;
-    if (!text.startsWith("/")) return this.task((p, s) => p.fabricator.run(text, s));
+    if (!text.startsWith("/")) return this.task((p, s) => p.builder.run(text, s));
 
-    const [cmd, ...rest] = text.split(/\s+/);
+    const [raw, ...rest] = text.split(/\s+/);
     const arg = rest.join(" ");
     const say = (t: string) => this.bus.emit("notice", { text: t });
+    const l = theme().lines;
+    // Every theme's name for a command works in every theme: /quest in Netrunner is still a heist.
+    const cmd = PLAN_COMMANDS.has(raw) ? "/heist" : ACHIEVEMENT_COMMANDS.has(raw) ? "/hacks" : raw;
     switch (cmd) {
       case "/quit":
       case "/exit":
         return "quit";
       case "/help":
-        say(HELP);
+        say(help());
         return;
       case "/heist":
-      case "/council":
-        if (!arg) return say(`Usage: ${cmd} <task>`);
+        if (!arg) return say(`Usage: ${raw} <task>`);
         return this.task(async (p, s) => {
           await runHeist(p, this.bus, this.root, arg, s);
           if (!s.aborted) this.engine.award("full_crew");
@@ -199,30 +219,38 @@ export class Session {
         say(this.stats());
         return;
       case "/hacks":
-      case "/labours":
         say(this.hacks());
         return;
+      case "/theme":
+      case "/themes": {
+        if (!arg) return say(themeList());
+        const next = findTheme(arg);
+        if (!next) return say(`No theme called "${arg}". ${themeList()}`);
+        this.switchTheme(next);
+        say(next.lines.themeSet);
+        return;
+      }
       case "/mute":
         this.sound = !this.sound;
         if (!this.sound) {
           this.tts = false;
           stopSpeaking();
         }
-        say(this.sound ? "Audio back online." : "Audio offline. Running silent.");
+        say(this.sound ? l.soundOn : l.soundOff);
         return;
       case "/tts":
         this.tts = !this.tts;
         if (!this.tts) stopSpeaking();
-        say(this.tts ? "Pirate Radio is live on the speakers." : "Pirate Radio goes text-only.");
+        say(this.tts ? l.ttsOn : l.ttsOff);
         return;
       case "/serious":
         this.serious = !this.serious;
         this.applyMode();
-        say(this.serious ? "Serious mode: no narration, sound or cred. Just the work." : "Neon back on. The city wakes up.");
+        say(this.serious ? l.seriousOn : l.seriousOff);
         return;
       case "/clear":
         if (this.crew) Object.values(this.crew).forEach((a) => a.reset());
-        say("Memory wiped. The crew forgets everything said so far.");
+        say(l.cleared);
         return;
       default:
         say(`Unknown command ${cmd}. Try /help.`);
@@ -230,20 +258,21 @@ export class Session {
   }
 
   private stats(): string {
+    const t = theme();
     const p = this.engine.profile;
     const { rank, next } = progress(p.xp);
     const earned = Object.keys(p.hacks).length;
     return [
-      `${rank.glyph} ${rank.name} · ${p.xp} cred${next ? ` (${next.min - p.xp} to ${next.name})` : ""}`,
-      `Hacks: ${earned}/${Object.keys(HACKS).length} · Sessions: ${p.stats.sessions} · Day streak: ${streak(p.days)}`,
-      `Tests fixed: ${p.stats.testsFixed} · Threats purged: ${p.stats.bossesDefeated} · Jobs: ${p.stats.tasks} · Black ICE approvals: ${p.stats.reviewsPassed}`,
+      `${rank.glyph} ${rank.name} · ${p.xp} ${t.words.xp}${next ? ` (${next.min - p.xp} to ${next.name})` : ""}`,
+      `${cap(t.words.achievements)}: ${earned}/${allHacks().length} · Sessions: ${p.stats.sessions} · Day streak: ${streak(p.days)}`,
+      `Tests fixed: ${p.stats.testsFixed} · ${cap(t.words.foes)} ${t.words.defeated}: ${p.stats.bossesDefeated} · ${cap(t.words.jobs)}: ${p.stats.tasks} · ${t.crew.critic.title} approvals: ${p.stats.reviewsPassed}`,
     ].join("\n");
   }
 
   private hacks(): string {
     const earned = this.engine.profile.hacks;
-    return Object.values(HACKS)
-      .map((l) => `${earned[l.id] ? "✦" : "·"} ${l.title.padEnd(20)} ${l.description}  (+${l.reward})`)
+    return allHacks()
+      .map((h) => `${earned[h.id] ? "✦" : "·"} ${h.title.padEnd(24)} ${h.description}  (+${h.reward})`)
       .join("\n");
   }
 }
@@ -256,12 +285,42 @@ function hasCredentials(): boolean {
   return fs.existsSync(path.join(configDir, "anthropic"));
 }
 
-const HELP = `Type a job and Fabricator takes it. Commands:
-  /heist <task>    Strategos plans, Fabricator builds, Black ICE reviews
-  /roast           Black ICE reviews your uncommitted changes
-  /stats           your rank, cred and record
-  /hacks           achievements earned and still to earn
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
+/** Each theme's names for the plan-build-review and achievements commands, plus the classics. */
+const PLAN_COMMANDS = new Set(["/heist", "/council", ...Object.values(THEMES).map((t) => `/${t.words.plan}`)]);
+const ACHIEVEMENT_COMMANDS = new Set(["/hacks", "/labours", "/achievements", ...Object.values(THEMES).map((t) => `/${t.words.achievements}`)]);
+
+export function themeList(): string {
+  const current = theme().id;
+  const rows = Object.values(THEMES).map((t) => `${t.id === current ? "▸" : " "} ${t.id.padEnd(10)} ${t.tagline}  (also: ${t.aliases.join(", ")})`);
+  return `Themes. Switch with /theme <name>; your progress carries over.\n${rows.join("\n")}`;
+}
+
+function help(): string {
+  const t = theme();
+  const { builder, planner, critic } = t.crew;
+  return fill(
+    `Type a {job} and {builder} takes it. Commands:
+  {plan}{planner} plans, {builder} builds, {critic} reviews
+  /roast           {critic} reviews your uncommitted changes
+  /stats           your rank, {xp} and record
+  {achievements}{Achievements} earned and still to earn
+  /theme [name]    list the themes, or switch to one
   /mute            toggle sound      /tts      toggle spoken narration
   /serious         toggle the fun    /clear    wipe the conversation
-  /quit            jack out
-Esc interrupts the crew mid-job.`;
+  /quit            {quit}
+Esc interrupts the crew mid-job.`,
+    {
+      job: t.words.job,
+      builder: builder.title,
+      planner: planner.title,
+      critic: critic.title,
+      xp: t.words.xp,
+      plan: `/${t.words.plan} <task>`.padEnd(17),
+      achievements: `/${t.words.achievements}`.padEnd(17),
+      Achievements: cap(t.words.achievements),
+      quit: t.lines.quit,
+    },
+  );
+}

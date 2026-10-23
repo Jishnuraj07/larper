@@ -1,5 +1,5 @@
 /**
- * Ambrosia desktop: an Electron window over the same Session the terminal UI
+ * Larper desktop: an Electron window over the same Session the terminal UI
  * uses. The main process runs the crew, the game and the sound; it forwards
  * every bus event to the window and relays the user's input and Operator answers
  * back.
@@ -7,6 +7,7 @@
  *   npm run desktop                 open the last project (or pick one)
  *   npm run desktop -- --demo       scripted demo project, no API key needed
  *   npm run desktop -- --cwd=DIR    open DIR
+ *   npm run desktop -- --theme=NAME start in a theme (netrunner, olympus, dungeon, starship, hustle)
  */
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import fs from "node:fs";
@@ -14,11 +15,12 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Session, type ApprovalAnswer } from "../session.js";
-import { ambrosiaHome } from "../config.js";
+import { larperHome } from "../config.js";
 import type { EventName } from "../events.js";
-import { HACKS } from "../game/hacks.js";
-import { RANKS } from "../game/ranks.js";
-import { PERSONAS } from "../agent/personas.js";
+import { allHacks } from "../game/hacks.js";
+import { ranks } from "../game/ranks.js";
+import { personas } from "../agent/personas.js";
+import { THEMES } from "../theme/index.js";
 import { createDemoProject, createScriptedClient, demoScripts } from "../testing/demo.js";
 import { runDesktopSmoke } from "./smoke.js";
 
@@ -26,7 +28,7 @@ const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 
 const EVENTS: EventName[] = [
   "turn_start", "text", "thinking", "tool_start", "tool_end", "approval", "edit", "shell_result", "test_result",
-  "review", "turn_end", "error", "notice", "xp", "rank_up", "hack", "boss", "narration",
+  "review", "turn_end", "error", "notice", "xp", "rank_up", "hack", "boss", "narration", "theme",
 ];
 
 const argv = process.argv.slice(1);
@@ -35,7 +37,7 @@ const option = (name: string) => argv.find((a) => a.startsWith(`--${name}=`))?.s
 
 const smoke = flag("smoke");
 const demo = flag("demo") || smoke;
-if (smoke) process.env.AMBROSIA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "ambrosia-desktop-home-"));
+if (smoke) process.env.LARPER_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "larper-desktop-home-"));
 
 let win: BrowserWindow | null = null;
 let session: Session | null = null;
@@ -43,11 +45,12 @@ let unsubscribe: Array<() => void> = [];
 const pendingApprovals = new Map<number, (a: ApprovalAnswer) => void>();
 let nextApproval = 1;
 let markReady: () => void = () => {};
+let themeFlag = option("theme");
 const sessionReady = new Promise<void>((r) => (markReady = r));
 
 // --- Remembering the last project -------------------------------------------
 
-const prefsFile = () => path.join(ambrosiaHome(), "desktop.json");
+const prefsFile = () => path.join(larperHome(), "desktop.json");
 
 function lastProject(): string | null {
   try {
@@ -61,7 +64,7 @@ function lastProject(): string | null {
 function rememberProject(root: string): void {
   if (demo) return;
   try {
-    fs.mkdirSync(ambrosiaHome(), { recursive: true });
+    fs.mkdirSync(larperHome(), { recursive: true });
     fs.writeFileSync(prefsFile(), JSON.stringify({ lastProject: root }, null, 2));
   } catch {
     // Not worth failing over.
@@ -84,18 +87,21 @@ function openSession(root: string): void {
   session = new Session({
     root,
     mute: smoke,
+    theme: themeFlag,
     client: demo ? createScriptedClient(demoScripts(), smoke ? 150 : 700) : undefined,
   });
-  unsubscribe = EVENTS.map((name) => session!.bus.on(name, (payload) => send("ambrosia:event", name, payload)));
+  unsubscribe = EVENTS.map((name) => session!.bus.on(name, (payload) => send("larper:event", name, payload)));
   session.setApprovalHandler(
     (req) =>
       new Promise<ApprovalAnswer>((resolve) => {
         const id = nextApproval++;
         pendingApprovals.set(id, resolve);
-        send("ambrosia:approval", id, req);
+        send("larper:approval", id, req);
       }),
   );
   rememberProject(root);
+  // --theme picks the first session's theme; after that the user's own switches stand.
+  themeFlag = undefined;
 }
 
 export function snapshot() {
@@ -111,9 +117,11 @@ export function snapshot() {
     xp: p.xp,
     stats: p.stats,
     boss: s.engine.boss,
-    ranks: RANKS,
-    personas: PERSONAS,
-    hacks: Object.values(HACKS).map((l) => ({ ...l, earned: Boolean(p.hacks[l.id]) })),
+    theme: s.theme,
+    themes: Object.values(THEMES).map((t) => ({ id: t.id, name: t.name, tagline: t.tagline })),
+    ranks: ranks(),
+    personas: personas(),
+    hacks: allHacks().map((h) => ({ ...h, earned: Boolean(p.hacks[h.id]) })),
   };
 }
 
@@ -128,33 +136,33 @@ async function pickFolder(): Promise<string | null> {
 }
 
 function demoRoot(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ambrosia-demo-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "larper-demo-"));
   createDemoProject(dir);
   return dir;
 }
 
 // --- IPC ----------------------------------------------------------------------
 
-ipcMain.handle("ambrosia:init", async () => {
+ipcMain.handle("larper:init", async () => {
   await sessionReady;
   return snapshot();
 });
 
-ipcMain.handle("ambrosia:submit", async (_e, line: string) => {
+ipcMain.handle("larper:submit", async (_e, line: string) => {
   const result = await session!.submit(String(line));
   if (result === "quit") app.quit();
   return snapshot();
 });
 
-ipcMain.on("ambrosia:interrupt", () => session?.interrupt());
+ipcMain.on("larper:interrupt", () => session?.interrupt());
 
-ipcMain.on("ambrosia:approve", (_e, id: number, answer: ApprovalAnswer) => {
+ipcMain.on("larper:approve", (_e, id: number, answer: ApprovalAnswer) => {
   const resolve = pendingApprovals.get(id);
   pendingApprovals.delete(id);
   resolve?.(answer === "yes" || answer === "always" ? answer : "no");
 });
 
-ipcMain.handle("ambrosia:pickFolder", async () => {
+ipcMain.handle("larper:pickFolder", async () => {
   if (session?.busy) return null;
   const dir = await pickFolder();
   if (!dir) return null;
@@ -172,7 +180,7 @@ async function createWindow(): Promise<void> {
     minHeight: 600,
     show: !smoke,
     backgroundColor: "#171927",
-    title: "Ambrosia",
+    title: "Larper",
     icon: path.join(appRoot, "desktop", "icon.png"),
     autoHideMenuBar: true,
     webPreferences: {

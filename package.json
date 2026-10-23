@@ -1,12 +1,13 @@
 {
-  "name": "ambrosia",
-  "version": "1.2.0",
-  "description": "A cyberpunk coding-agent harness: Claude as a netrunner crew, your failing tests as rogue programs.",
+  "name": "larper",
+  "version": "1.0.0",
+  "description": "A coding-agent harness that plays dress-up: Claude as a crew in five switchable themes, from netrunners to Greek gods to a LinkedIn-style parody.",
   "scripts": {
     "start": "tsx src/cli.tsx",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx scripts/smoke.tsx",
+    "smoke:themes": "tsx scripts/smoke.tsx --theme=all",
     "build": "tsc -p tsconfig.build.json",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "prebuild": "npm run clean",
@@ -15,7 +16,7 @@
     "smoke:desktop": "npm run build && electron . --smoke --shots=shots",
     "package:desktop": "npm run build && electron-builder"
   },
-  "keywords": [],
+  "keywords": ["claude", "coding-agent", "cli", "electron", "themes", "gamification"],
   "author": "jishnuneoz",
   "license": "ISC",
   "type": "module",
@@ -44,7 +45,7 @@
     "electron-winstaller": false
   },
   "bin": {
-    "ambrosia": "bin/ambrosia.mjs"
+    "larper": "bin/larper.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -58,8 +59,8 @@
   ],
   "main": "dist/desktop/main.js",
   "build": {
-    "appId": "dev.ambrosia.desktop",
-    "productName": "Ambrosia",
+    "appId": "dev.larper.desktop",
+    "productName": "Larper",
     "directories": {
       "output": "release"
     },

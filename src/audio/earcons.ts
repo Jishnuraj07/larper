@@ -59,7 +59,7 @@ export function synthesize(notes: Note[]): Buffer {
   return Buffer.concat([header, data]);
 }
 
-const dir = path.join(os.tmpdir(), "ambrosia-earcons-v2");
+const dir = path.join(os.tmpdir(), "larper-earcons-v2");
 
 function fileFor(name: Earcon): string {
   const file = path.join(dir, `${name}.wav`);

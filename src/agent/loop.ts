@@ -37,12 +37,10 @@ function isModern(model: string): boolean {
 export class Agent {
   readonly crew: CrewName;
   private messages: MessageParam[] = [];
-  private readonly system: string;
   private readonly tools: Anthropic.Beta.BetaTool[];
 
   constructor(private opts: AgentOptions) {
     this.crew = opts.crew;
-    this.system = systemPrompt(opts.crew, opts.root);
     this.tools = opts.tools && opts.tools.length === 0 ? [] : toolParams(opts.tools);
   }
 
@@ -60,7 +58,8 @@ export class Agent {
     return {
       model,
       max_tokens: modern ? 64_000 : 16_000,
-      system: this.system,
+      // Rebuilt each time: switching themes mid-session changes the voice, not the history.
+      system: systemPrompt(this.crew, this.opts.root),
       messages: this.messages,
       cache_control: { type: "ephemeral" },
       ...(this.tools.length ? { tools: this.tools } : {}),
@@ -217,7 +216,7 @@ export function describeError(err: unknown): string {
   if (err instanceof Anthropic.AuthenticationError) {
     return "Access denied: authentication failed. Set ANTHROPIC_API_KEY or run `ant auth login`.";
   }
-  if (err instanceof Anthropic.RateLimitError) return "Rate limited. The net is congested; try again shortly.";
+  if (err instanceof Anthropic.RateLimitError) return "Rate limited. Try again shortly.";
   if (err instanceof Anthropic.BadRequestError) return `Bad request: ${err.message}`;
   if (err instanceof Anthropic.APIError) return `API error ${err.status ?? ""}: ${err.message}`;
   return err instanceof Error ? err.message : String(err);

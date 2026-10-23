@@ -1,6 +1,6 @@
 name: Release
 
-# Push a version tag (git tag v1.3.0 && git push origin v1.3.0) to build the
+# Push a version tag (git tag v1.1.0 && git push origin v1.1.0) to build the
 # Windows installers, have SignPath sign them, and open a draft GitHub release
 # with the signed files. Review the draft, write the notes, then publish it.
 #
@@ -37,8 +37,8 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           mkdir unsigned
-          cp "release/Ambrosia Setup $v.exe" "unsigned/Ambrosia-Setup-$v.exe"
-          cp "release/Ambrosia $v.exe" "unsigned/Ambrosia-$v-portable.exe"
+          cp "release/Larper Setup $v.exe" "unsigned/Larper-Setup-$v.exe"
+          cp "release/Larper $v.exe" "unsigned/Larper-$v-portable.exe"
       - id: upload
         uses: actions/upload-artifact@v4
         with:
@@ -55,7 +55,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ambrosia
+          project-slug: larper
           signing-policy-slug: release-signing
           artifact-configuration-slug: installers
           github-artifact-id: ${{ needs.build.outputs.artifact-id }}
@@ -78,4 +78,4 @@ jobs:
             echo '```'
           } > notes.md
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
-            --title "Ambrosia ${GITHUB_REF_NAME#v}" --notes-file notes.md *.exe
+            --title "Larper ${GITHUB_REF_NAME#v}" --notes-file notes.md *.exe

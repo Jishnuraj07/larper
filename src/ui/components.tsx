@@ -4,41 +4,38 @@ import Spinner from "ink-spinner";
 import type { CrewName } from "../config.js";
 import type { Boss, Hack } from "../events.js";
 import type { ApprovalRequest } from "../agent/tools.js";
-import { PERSONAS, workingLine } from "../agent/personas.js";
+import { persona, workingLine } from "../agent/personas.js";
 import { progress } from "../game/ranks.js";
+import { fill, theme } from "../theme/index.js";
 
-const YELLOW = "#fcee0a";
-const CYAN = "#00f0ff";
 const DIM = "gray";
 
-const BANNER = [
-  "    _    __  __ ____  ____   ___  ____ ___    _    ",
-  "   / \\  |  \\/  | __ )|  _ \\ / _ \\/ ___|_ _|  / \\   ",
-  "  / _ \\ | |\\/| |  _ \\| |_) | | | \\___ \\| |  / _ \\  ",
-  " / ___ \\| |  | | |_) |  _ <| |_| |___) | | / ___ \\ ",
-  "/_/   \\_\\_|  |_|____/|_| \\_\\\\___/|____/___/_/   \\_\\",
+export const BANNER = [
+  " _        _    ____  ____  _____ ____  ",
+  "| |      / \  |  _ \|  _ \| ____|  _ \ ",
+  "| |     / _ \ | |_) | |_) |  _| | |_) |",
+  "| |___ / ___ \|  _ <|  __/| |___|  _ < ",
+  "|_____/_/   \_\_| \_\_|   |_____|_| \_\\",
 ];
-const BANNER_COLORS = ["#fcee0a", "#fcee0a", "#fcd20a", "#ff7a1f", "#ff003c"];
 
 export function Banner({ serious }: { serious: boolean }) {
+  const t = theme();
   return (
     <Box flexDirection="column" marginBottom={1}>
       {BANNER.map((line, i) => (
-        <Text key={i} color={BANNER_COLORS[i]}>
+        <Text key={i} color={t.colors.banner[i]}>
           {line}
         </Text>
       ))}
       <Text color={DIM}>
-        {serious
-          ? "  serious mode · type a task, /help for commands"
-          : "  jack in · type a job for Fabricator, /help for commands"}
+        {serious ? "  serious mode · type a task, /help for commands" : `  ${t.name} · ${t.lines.welcome}`}
       </Text>
     </Box>
   );
 }
 
 export function CrewLabel({ crew }: { crew: CrewName }) {
-  const p = PERSONAS[crew];
+  const p = persona(crew);
   return (
     <Text color={p.color} bold>
       {p.glyph} {p.title}
@@ -48,7 +45,7 @@ export function CrewLabel({ crew }: { crew: CrewName }) {
 
 export function CrewBubble({ crew, text }: { crew: CrewName; text: string }) {
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={PERSONAS[crew].color} paddingX={1} marginTop={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={persona(crew).color} paddingX={1} marginTop={1}>
       <CrewLabel crew={crew} />
       <Text>{text.trim()}</Text>
     </Box>
@@ -60,8 +57,8 @@ export function Working({ crew, tick, thinking }: { crew: CrewName; tick: number
   return (
     <Box flexDirection="column" marginTop={1}>
       <Text>
-        <Text color={PERSONAS[crew].color}>
-          <Spinner type="binary" />{" "}
+        <Text color={persona(crew).color}>
+          <Spinner type={theme().spinner} />{" "}
         </Text>
         <CrewLabel crew={crew} />
         <Text color={DIM}> is {workingLine(crew, tick)}… (Esc to interrupt)</Text>
@@ -105,14 +102,15 @@ export function ToolLine({ name, summary, ok, result }: { name: string; summary:
 }
 
 export function BossBar({ boss }: { boss: Boss }) {
+  const t = theme();
   const width = Math.min(boss.maxHp, 20);
   const filled = Math.round((boss.hp / boss.maxHp) * width);
   return (
     <Text>
-      <Text color="red" bold>
-        ☣ {boss.name}{" "}
+      <Text color={t.colors.danger} bold>
+        {t.icons.foe} {boss.name}{" "}
       </Text>
-      <Text color="red">{"█".repeat(filled)}</Text>
+      <Text color={t.colors.danger}>{"█".repeat(filled)}</Text>
       <Text color={DIM}>{"░".repeat(width - filled)}</Text>
       <Text color={DIM}>
         {" "}
@@ -124,19 +122,24 @@ export function BossBar({ boss }: { boss: Boss }) {
 
 export function StatusBar({ xp, serious, sound, tts }: { xp: number; serious: boolean; sound: boolean; tts: boolean }) {
   if (serious) return <Text color={DIM}>serious mode · /serious to bring back the fun</Text>;
+  const t = theme();
   const { rank, next, fraction } = progress(xp);
   const width = 16;
   const filled = Math.round(fraction * width);
   return (
     <Text>
-      <Text color={YELLOW} bold>
+      <Text color={t.colors.accent} bold>
         {rank.glyph} {rank.name}
       </Text>{" "}
-      <Text color={CYAN}>{"▰".repeat(filled)}</Text>
+      <Text color={t.colors.signal}>{"▰".repeat(filled)}</Text>
       <Text color={DIM}>{"▱".repeat(width - filled)}</Text>{" "}
-      <Text color={CYAN}>◆ {xp}</Text>
+      <Text color={t.colors.signal}>
+        {t.icons.xp} {xp}
+      </Text>
       <Text color={DIM}>
-        {next ? ` / ${next.min} to ${next.name}` : " · top of the grid"}
+        {next ? ` / ${next.min} to ${next.name}` : ` · ${t.lines.topRank}`}
+        {" · "}
+        {t.name}
         {" · "}
         {sound ? (tts ? "🔊 voice" : "🔉") : "🔇"}
       </Text>
@@ -144,40 +147,48 @@ export function StatusBar({ xp, serious, sound, tts }: { xp: number; serious: bo
   );
 }
 
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+
 export function HackCard({ hack }: { hack: Hack }) {
+  const t = theme();
   return (
-    <Box borderStyle="double" borderColor={CYAN} paddingX={1} marginTop={1} flexDirection="column">
-      <Text color={CYAN} bold>
-        🔓 Hack unlocked: {hack.title}
+    <Box borderStyle="double" borderColor={t.colors.signal} paddingX={1} marginTop={1} flexDirection="column">
+      <Text color={t.colors.signal} bold>
+        {t.icons.unlock} {cap(t.words.achievement)} unlocked: {hack.title}
       </Text>
       <Text>
-        {hack.description} <Text color={CYAN}>+{hack.reward} cred</Text>
+        {hack.description}{" "}
+        <Text color={t.colors.signal}>
+          +{hack.reward} {t.words.xp}
+        </Text>
       </Text>
     </Box>
   );
 }
 
 export function RankUp({ rank }: { rank: string }) {
+  const t = theme();
   return (
-    <Box borderStyle="bold" borderColor={YELLOW} paddingX={2} marginTop={1} justifyContent="center">
-      <Text color={YELLOW} bold>
-        ▲ UPGRADE INSTALLED ▲ You are now a {rank}
+    <Box borderStyle="bold" borderColor={t.colors.accent} paddingX={2} marginTop={1} justifyContent="center">
+      <Text color={t.colors.accent} bold>
+        {fill(t.lines.rankUp, { rank })}
       </Text>
     </Box>
   );
 }
 
 export function GatePrompt({ req }: { req: ApprovalRequest }) {
+  const t = theme();
   const verb =
     req.tool === "shell" ? "run a command" : req.tool === "run_tests" ? "run the tests" : req.tool === "write_file" ? "write a file" : "edit a file";
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={req.risky ? "red" : CYAN} paddingX={1} marginTop={1}>
-      <Text color={CYAN} bold>
-        ⌬ Operator check: may {PERSONAS[req.crew].title} {verb}?
+    <Box flexDirection="column" borderStyle="round" borderColor={req.risky ? "red" : t.colors.signal} paddingX={1} marginTop={1}>
+      <Text color={t.colors.signal} bold>
+        {t.icons.gate} {t.words.gate}: may {persona(req.crew).title} {verb}?
       </Text>
       {req.risky ? (
         <Text color="red" bold>
-          ⚠ Threat level high. This one looks dangerous.
+          ⚠ {t.lines.risky}
         </Text>
       ) : null}
       <Text>{req.detail}</Text>

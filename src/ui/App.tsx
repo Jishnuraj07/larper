@@ -5,6 +5,7 @@ import type { CrewName } from "../config.js";
 import type { Boss, Hack } from "../events.js";
 import type { ApprovalRequest } from "../agent/tools.js";
 import type { ApprovalAnswer, Session } from "../session.js";
+import { fill, theme } from "../theme/index.js";
 import { Banner, BossBar, CrewBubble, HackCard, GatePrompt, RankUp, StatusBar, ToolLine, Working } from "./components.js";
 
 type Entry =
@@ -37,13 +38,14 @@ interface RunningTool {
 let nextId = 0;
 
 function EntryView({ e }: { e: Entry }) {
+  const t = theme();
   switch (e.kind) {
     case "banner":
       return null;
     case "user":
       return (
         <Box marginTop={1}>
-          <Text color="#fcee0a" bold>
+          <Text color={t.colors.accent} bold>
             ›{" "}
           </Text>
           <Text bold>{e.text}</Text>
@@ -56,26 +58,29 @@ function EntryView({ e }: { e: Entry }) {
     case "notice":
       return (
         <Box marginTop={1}>
-          <Text color="#00f0ff">{e.text}</Text>
+          <Text color={t.colors.signal}>{e.text}</Text>
         </Box>
       );
     case "error":
       return (
         <Box marginTop={1}>
-          <Text color="red">⚡ {e.text}</Text>
+          <Text color="red">
+            {t.icons.error} {e.text}
+          </Text>
         </Box>
       );
     case "narration":
       return (
-        <Text color="#ff3ec8" italic>
-          📡 Radio: {e.text}
+        <Text color={t.crew.narrator.color} italic>
+          {t.crew.narrator.glyph} {t.crew.narrator.title}: {e.text}
         </Text>
       );
     case "xp":
       return (
-        <Text color={e.amount > 0 ? "#00f0ff" : "#ff003c"}>
-          {"  "}◆ {e.amount > 0 ? "+" : ""}
-          {e.amount} cred <Text color="gray">· {e.reason}</Text>
+        <Text color={e.amount > 0 ? t.colors.signal : t.colors.danger}>
+          {"  "}
+          {t.icons.xp} {e.amount > 0 ? "+" : ""}
+          {e.amount} {t.words.xp} <Text color="gray">· {e.reason}</Text>
         </Text>
       );
     case "hack":
@@ -84,7 +89,7 @@ function EntryView({ e }: { e: Entry }) {
       return <RankUp rank={e.rank} />;
     case "boss":
       return (
-        <Text color="red" bold>
+        <Text color={t.colors.danger} bold>
           {"  "}
           {e.text}
         </Text>
@@ -166,20 +171,19 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
       }),
       b.on("hack", (hack) => add({ kind: "hack", hack })),
       b.on("rank_up", ({ rank }) => add({ kind: "rank", rank })),
+      // The theme is read at render time; the next frame picks it up. The fight keeps its foe, renamed.
+      b.on("theme", () => setBoss(session.engine.boss ? { ...session.engine.boss } : null)),
       b.on("boss", ({ boss: bs, change }) => {
         setBoss(change === "defeated" ? null : bs);
-        if (!bs) return;
-        const text =
-          change === "spawn"
-            ? `☣ A ${bs.name} appears! ${bs.hp} failing test${bs.hp > 1 ? "s" : ""}.`
-            : change === "grow"
-              ? `🧬 It replicates! The ${bs.name} now runs ${bs.hp}.`
-              : change === "hit"
-                ? `⚡ Hit! The ${bs.name} is down to ${bs.hp}.`
-                : change === "defeated"
-                  ? `✔ The ${bs.name} is purged! All tests pass.`
-                  : "";
-        if (text) add({ kind: "boss", text });
+        if (!bs || change === "none") return;
+        const { icons, lines } = theme();
+        const [icon, line] = {
+          spawn: [icons.foe, lines.foeSpawn],
+          grow: [icons.grow, lines.foeGrow],
+          hit: [icons.hit, lines.foeHit],
+          defeated: [icons.won, lines.foeDefeated],
+        }[change];
+        add({ kind: "boss", text: `${icon} ${fill(line, { foe: bs.name, n: bs.hp })}` });
       }),
     ];
     session.setApprovalHandler(
@@ -226,10 +230,9 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
       const c = ch.toLowerCase();
       const answer: ApprovalAnswer | null = c === "y" || key.return ? "yes" : c === "a" ? "always" : c === "n" || key.escape ? "no" : null;
       if (!answer) return;
-      add({
-        kind: "notice",
-        text: answer === "no" ? "⌬ Operator blocked it." : answer === "always" ? `⌬ Operator allows ${approval.req.tool} for this session.` : "⌬ Operator allows it.",
-      });
+      const { icons, lines } = theme();
+      const line = answer === "no" ? lines.gateNo : answer === "always" ? lines.gateAlways : lines.gateYes;
+      add({ kind: "notice", text: `${icons.gate} ${fill(line, { tool: approval.req.tool })}` });
       approval.resolve(answer);
       setApproval(null);
       return;
@@ -252,13 +255,13 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
         {boss && !mode.serious ? <BossBar boss={boss} /> : null}
         <StatusBar xp={xp} serious={mode.serious} sound={mode.sound} tts={mode.tts} />
         {busy ? (
-          <Text color="gray">{approval ? "Answer the Operator check above." : "The crew is on the job. Esc to interrupt."}</Text>
+          <Text color="gray">{approval ? `Answer the ${theme().words.gate} above.` : theme().lines.busy}</Text>
         ) : (
           <Box>
-            <Text color="#fcee0a" bold>
+            <Text color={theme().colors.accent} bold>
               ›{" "}
             </Text>
-            <TextInput value={input} onChange={setInput} onSubmit={(v) => void submit(v)} placeholder="What's the job?" />
+            <TextInput value={input} onChange={setInput} onSubmit={(v) => void submit(v)} placeholder={theme().lines.placeholder} />
           </Box>
         )}
       </Box>

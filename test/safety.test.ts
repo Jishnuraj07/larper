@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { confine } from "../src/agent/safety.js";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "ambrosia-safety-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "larper-safety-"));
 fs.mkdirSync(path.join(root, "src"));
 fs.writeFileSync(path.join(root, "src", "a.ts"), "");
 

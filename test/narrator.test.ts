@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { Bus } from "../src/events.js";
 import { Narrator } from "../src/narrator.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
-import { HACKS } from "../src/game/hacks.js";
+import { hack } from "../src/game/hacks.js";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -16,7 +16,7 @@ function setup(client: Anthropic | null = null) {
   return { bus, narrator, lines };
 }
 
-const boss = { name: "Rogue AI", hp: 0, maxHp: 5, startHp: 2 };
+const boss = { name: "Rogue AI", tier: 3, hp: 0, maxHp: 5, startHp: 2 };
 
 describe("Narrator", () => {
   it("narrates major moments from templates when there is no API client", async () => {
@@ -29,7 +29,7 @@ describe("Narrator", () => {
 
   it("batches a burst of events into one line", async () => {
     const { bus, lines } = setup();
-    bus.emit("hack", HACKS.first_blood);
+    bus.emit("hack", hack("first_blood"));
     bus.emit("rank_up", { rank: "Runner" });
     bus.emit("boss", { boss, change: "defeated" });
     await vi.advanceTimersByTimeAsync(1000);
@@ -39,15 +39,15 @@ describe("Narrator", () => {
   it("stays quiet when disabled", async () => {
     const { bus, narrator, lines } = setup();
     narrator.enabled = false;
-    bus.emit("hack", HACKS.first_blood);
+    bus.emit("hack", hack("first_blood"));
     await vi.advanceTimersByTimeAsync(1000);
     expect(lines).toEqual([]);
   });
 
-  it("ignores Fabricator turns that did not finish cleanly", async () => {
+  it("ignores builder turns that did not finish cleanly", async () => {
     const { bus, lines } = setup();
-    bus.emit("turn_end", { crew: "fabricator", text: "", stopReason: "aborted", inputTokens: 0, outputTokens: 0 });
-    bus.emit("turn_end", { crew: "blackice", text: "", stopReason: "end_turn", inputTokens: 0, outputTokens: 0 });
+    bus.emit("turn_end", { crew: "builder", text: "", stopReason: "aborted", inputTokens: 0, outputTokens: 0 });
+    bus.emit("turn_end", { crew: "critic", text: "", stopReason: "end_turn", inputTokens: 0, outputTokens: 0 });
     await vi.advanceTimersByTimeAsync(1000);
     expect(lines).toEqual([]);
   });
@@ -59,7 +59,7 @@ describe("Narrator", () => {
     }));
     const { bus, lines } = setup({ messages: { create } } as unknown as Anthropic);
 
-    bus.emit("edit", { crew: "fabricator", path: "src/a.ts" });
+    bus.emit("edit", { crew: "builder", path: "src/a.ts" });
     bus.emit("boss", { boss, change: "defeated" });
     await vi.advanceTimersByTimeAsync(1000);
     expect(lines).toEqual(["The whole grid cheers as the Rogue AI goes dark!"]);
@@ -68,7 +68,7 @@ describe("Narrator", () => {
     expect(params.messages[0].content).toContain("edited src/a.ts");
     expect(params.output_config).toBeUndefined(); // Haiku takes no effort setting
 
-    bus.emit("hack", HACKS.cracked_ice);
+    bus.emit("hack", hack("cracked_ice"));
     await vi.advanceTimersByTimeAsync(1000);
     expect(create).toHaveBeenCalledTimes(1);
     expect(lines[1]).toMatch(/Cracked the ICE/);

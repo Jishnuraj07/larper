@@ -5,10 +5,10 @@
 -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
   <zip-file>
-    <pe-file path="Ambrosia-Setup-*.exe">
+    <pe-file path="Larper-Setup-*.exe">
       <authenticode-sign />
     </pe-file>
-    <pe-file path="Ambrosia-*-portable.exe">
+    <pe-file path="Larper-*-portable.exe">
       <authenticode-sign />
     </pe-file>
   </zip-file>

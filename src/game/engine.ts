@@ -1,7 +1,8 @@
 import type { Boss, Bus, TestResult } from "../events.js";
-import { HACKS, type HackId } from "./hacks.js";
+import { hack, type HackId } from "./hacks.js";
 import { localDay, saveProfile, streak, type Profile } from "./profile.js";
-import { rankFor, threatFor } from "./ranks.js";
+import { rankFor, threatFor, tierFor } from "./ranks.js";
+import { theme } from "../theme/index.js";
 
 export const XP = {
   processKilled: 10,
@@ -19,7 +20,7 @@ export interface EngineOptions {
 }
 
 /**
- * Turns harness events into cred, ranks, hacks and threats. It only
+ * Turns harness events into cred, ranks, achievements and foes. It only
  * listens to the bus, so muting the fun never touches the agent itself.
  */
 export class GameEngine {
@@ -49,15 +50,15 @@ export class GameEngine {
         if (++this.denials === 3) this.award("firewall");
       }),
       bus.on("turn_end", (t) => {
-        if (!this.enabled || t.crew !== "fabricator" || t.stopReason !== "end_turn") return;
+        if (!this.enabled || t.crew !== "builder" || t.stopReason !== "end_turn") return;
         this.profile.stats.tasks++;
-        this.gain(XP.task, "job complete");
+        this.gain(XP.task, `${theme().words.job} complete`);
         if (this.profile.stats.tasks >= 10) this.award("gig_economy");
       }),
       bus.on("review", (r) => {
         if (!this.enabled || !r.approved) return;
         this.profile.stats.reviewsPassed++;
-        this.gain(XP.review, "Black ICE approves");
+        this.gain(XP.review, `${theme().crew.critic.title} approves`);
         this.award("cracked_ice");
       }),
     ];
@@ -76,16 +77,21 @@ export class GameEngine {
     this.save();
   }
 
+  /** After a theme switch: give the foe on the field its new name. */
+  retheme(): void {
+    if (this.boss) this.boss.name = threatFor(this.boss.maxHp);
+  }
+
   dispose(): void {
     this.unsubscribe.forEach((u) => u());
   }
 
   award(id: HackId): void {
     if (!this.enabled || this.profile.hacks[id]) return;
-    const hack = HACKS[id];
+    const earned = hack(id);
     this.profile.hacks[id] = this.now().toISOString();
-    this.bus.emit("hack", hack);
-    this.gain(hack.reward, hack.title);
+    this.bus.emit("hack", earned);
+    this.gain(earned.reward, earned.title);
   }
 
   gain(amount: number, reason: string): void {
@@ -119,7 +125,7 @@ export class GameEngine {
     const boss = this.boss;
     if (!boss) {
       if (r.failed > 0) {
-        this.boss = { name: threatFor(r.failed), hp: r.failed, maxHp: r.failed, startHp: r.failed };
+        this.boss = { name: threatFor(r.failed), tier: tierFor(r.failed), hp: r.failed, maxHp: r.failed, startHp: r.failed };
         this.bus.emit("boss", { boss: this.boss, change: "spawn" });
       } else if (r.passed > 0) {
         this.gain(XP.greenRun, "all green");
@@ -132,7 +138,7 @@ export class GameEngine {
       const killed = boss.hp;
       this.profile.stats.testsFixed += killed;
       this.profile.stats.bossesDefeated++;
-      this.gain(XP.processKilled * killed + XP.bossDefeated, `${boss.name} purged`);
+      this.gain(XP.processKilled * killed + XP.bossDefeated, `${boss.name} ${theme().words.defeated}`);
       this.award("first_blood");
       this.award("daemon_killer");
       if (boss.maxHp >= boss.startHp + 3) this.award("fork_bomb");
@@ -142,13 +148,14 @@ export class GameEngine {
       const killed = boss.hp - r.failed;
       boss.hp = r.failed;
       this.profile.stats.testsFixed += killed;
-      this.gain(XP.processKilled * killed, `${killed} process${killed > 1 ? "es" : ""} killed`);
+      this.gain(XP.processKilled * killed, `${killed} test${killed > 1 ? "s" : ""} fixed`);
       this.award("first_blood");
       this.bus.emit("boss", { boss: { ...boss }, change: "hit" });
     } else if (r.failed > boss.hp) {
       boss.hp = r.failed;
       boss.maxHp = Math.max(boss.maxHp, r.failed);
       boss.name = threatFor(boss.maxHp);
+      boss.tier = tierFor(boss.maxHp);
       this.bus.emit("boss", { boss: { ...boss }, change: "grow" });
     } else {
       this.bus.emit("boss", { boss: { ...boss }, change: "none" });

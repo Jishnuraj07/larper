@@ -1,7 +1,7 @@
-// Ambrosia desktop renderer. Talks to the main process only through
-// window.ambrosia (see preload.cjs). All model text is escaped before display.
+// Larper desktop renderer. Talks to the main process only through
+// window.larper (see preload.cjs). All model text is escaped before display.
 
-const api = window.ambrosia;
+const api = window.larper;
 const $ = (id) => document.getElementById(id);
 const RING = 2 * Math.PI * 84; // circumference of the arena ring
 
@@ -18,7 +18,7 @@ const TOOL_LABELS = {
 const TOOL_NAMES = { read_file: "reading", write_file: "writing files", edit_file: "editing", glob: "finding files", grep: "searching", shell: "commands", run_tests: "running tests" };
 const VERBS = { shell: "run a command", run_tests: "run the tests", write_file: "write a file", edit_file: "edit a file" };
 
-let state = null; // snapshot from the main process
+let state = null; // snapshot from the main process, including the current theme
 let busy = false;
 let live = null; // the crew currently speaking: { crew, md, text, thinking }
 const steps = new Map(); // tool_use id -> row
@@ -71,6 +71,14 @@ function markdown(src) {
 }
 
 const persona = (crew) => state.personas[crew];
+const T = () => state.theme;
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+
+/** Fill a theme template's {placeholders}; {s} pluralises against {n}. */
+function fill(template, vars = {}) {
+  const all = { s: vars.n === 1 ? "" : "s", ...vars };
+  return template.replace(/\{(\w+)\}/g, (_, k) => String(all[k] ?? ""));
+}
 
 function scrollDown(force = false) {
   const t = $("transcript");
@@ -154,7 +162,7 @@ function reveal() {
 
 function drawLive(n, streaming) {
   let text = live.text.slice(0, n);
-  // Black ICE ends with a protocol line for the harness; show it as a tag instead.
+  // The critic ends with a protocol line for the harness; show it as a tag instead.
   const verdict = streaming ? null : text.match(/VERDICT:\s*(APPROVED|REVISE)/i);
   text = streaming ? text.replace(/\n\s*VERDICT[\s\S]*$/i, "") : text.replace(/\n?\s*VERDICT:\s*(APPROVED|REVISE)\s*$/i, "");
   live.md.innerHTML = markdown(text);
@@ -205,7 +213,8 @@ function renderRank() {
   $("rank-name").textContent = rank.name;
   $("xp-fill").style.width = `${Math.round(fraction * 100)}%`;
   $("xp-label").textContent = String(state.xp);
-  $("rank").title = next ? `${state.xp} cred. ${next.min - state.xp} more to reach ${next.name}.` : `${state.xp} cred. The highest rank.`;
+  const xp = T().words.xp;
+  $("rank").title = next ? `${state.xp} ${xp}. ${next.min - state.xp} more to reach ${next.name}.` : `${state.xp} ${xp}. The highest rank: ${T().lines.topRank}.`;
   $("rank").hidden = state.serious;
 }
 
@@ -219,11 +228,12 @@ function floatXp(amount) {
 
 function renderStats() {
   const s = state.stats;
+  const w = T().words;
   const rows = [
     ["Tests fixed", s.testsFixed],
-    ["Threats purged", s.bossesDefeated],
-    ["Jobs done", s.tasks],
-    ["Black ICE approvals", s.reviewsPassed],
+    [`${cap(w.foes)} ${w.defeated}`, s.bossesDefeated],
+    [`${cap(w.jobs)} done`, s.tasks],
+    [`${persona("critic").title} approvals`, s.reviewsPassed],
     ["Sessions", s.sessions],
   ];
   const dl = $("stats");
@@ -239,7 +249,7 @@ function renderHacks(freshId) {
   ul.replaceChildren();
   for (const l of state.hacks) {
     const li = el("li", `${l.earned ? "earned" : ""}${l.id === freshId ? " fresh" : ""}`);
-    li.title = `${l.description}. Worth ${l.reward} cred.`;
+    li.title = `${l.description}. Worth ${l.reward} ${T().words.xp}.`;
     li.appendChild(el("span", "pip"));
     li.appendChild(el("span", "", l.title));
     ul.appendChild(li);
@@ -263,22 +273,22 @@ function renderArena(boss, change) {
   if (change === "defeated") {
     a.classList.remove("fighting");
     setRing(1);
-    $("foe-name").textContent = `${boss?.name ?? "Threat"} purged`;
+    $("foe-name").textContent = `${boss?.name ?? cap(T().words.foe)} ${T().words.defeated}`;
     $("foe-hp").textContent = "All tests pass";
     pulseArena("won");
     setTimeout(() => {
       if (state.boss) return; // a new fight began meanwhile
       a.classList.remove("won");
-      $("foe-name").textContent = "All clear";
-      $("foe-hp").textContent = "No failing tests";
+      $("foe-name").textContent = T().lines.allClear;
+      $("foe-hp").textContent = T().lines.noFoe;
     }, 3000);
     return;
   }
   if (!boss) {
     a.classList.remove("fighting");
     setRing(1);
-    $("foe-name").textContent = "All clear";
-    $("foe-hp").textContent = "No failing tests";
+    $("foe-name").textContent = T().lines.allClear;
+    $("foe-hp").textContent = T().lines.noFoe;
     return;
   }
   a.classList.add("fighting");
@@ -293,7 +303,7 @@ function renderTools() {
   sound.querySelector("use").setAttribute("href", state.sound ? "#i-sound" : "#i-sound-off");
   sound.title = state.sound ? "Sound on" : "Sound off";
   $("toggle-tts").classList.toggle("on", state.tts);
-  $("toggle-tts").title = state.tts ? "Pirate Radio reads its lines aloud (on)" : "Pirate Radio reads its lines aloud (off)";
+  $("toggle-tts").title = `${persona("narrator").title} reads its lines aloud (${state.tts ? "on" : "off"})`;
   $("toggle-serious").classList.toggle("on", state.serious);
   $("toggle-serious").title = state.serious ? "Serious mode is on" : "Serious mode: no game, no narration";
   $("project-path").textContent = state.root;
@@ -302,7 +312,29 @@ function renderTools() {
   document.querySelector(".rail").hidden = state.serious;
 }
 
+/** Dress the window in the current theme: palette (style.css), names and every fixed label. */
+function applyTheme() {
+  const t = T();
+  const w = t.words;
+  document.documentElement.dataset.theme = t.id;
+  document.body.style.setProperty("--narrator", persona("narrator").color);
+  $("theme-picker").value = t.id;
+  $("theme-picker").title = `Theme: ${t.name}. ${t.tagline}`;
+  $("hacks-title").firstChild.textContent = `${cap(w.achievements)} `;
+  $("prompt").placeholder = `${t.lines.placeholder} Or type / for commands`;
+  $("plan-shortcut").textContent = cap(w.plan);
+  $("plan-shortcut").dataset.insert = `/${w.plan} `;
+  $("upgrade-sub").textContent = t.lines.rankUpTitle;
+  const empty = document.querySelector(".empty");
+  if (empty) {
+    $("empty-title").textContent = t.lines.placeholder;
+    $("empty-sub").textContent = t.lines.emptySub;
+  }
+  document.title = `Larper · ${t.name}`;
+}
+
 function renderAll() {
+  applyTheme();
   renderRank();
   renderHacks();
   renderStats();
@@ -356,7 +388,7 @@ const handlers = {
   },
   narration({ text }) {
     const n = el("div", "radio");
-    n.appendChild(el("b", "", "Radio "));
+    n.appendChild(el("b", "", `${persona("narrator").title} `));
     n.appendChild(document.createTextNode(text));
     append(n);
   },
@@ -364,7 +396,7 @@ const handlers = {
     state.xp = total;
     renderRank();
     floatXp(amount);
-    if (amount < 0) line("event foe", `A test you fixed broke again. ${amount} cred.`);
+    if (amount < 0) line("event foe", `${T().lines.regression} ${amount} ${T().words.xp}.`);
   },
   hack(hack) {
     const l = state.hacks.find((x) => x.id === hack.id);
@@ -384,18 +416,16 @@ const handlers = {
     $("upgrade").hidden = false;
     setTimeout(() => ($("upgrade").hidden = true), 3200);
   },
+  theme() {
+    // The snapshot that comes back from the /theme command carries the new theme; nothing to do until then.
+  },
   boss({ boss, change }) {
     if (state.serious || !boss || change === "none") return;
     state.boss = change === "defeated" ? null : boss;
     renderArena(boss, change);
-    const n = boss.hp;
-    const text = {
-      spawn: `A ${boss.name} appears with ${n} failing test${n === 1 ? "" : "s"}.`,
-      grow: `The ${boss.name} replicates. ${n} tests failing now.`,
-      hit: `The ${boss.name} takes a hit. ${n} left.`,
-      defeated: `The ${boss.name} is purged. All tests pass.`,
-    }[change];
-    line(`event ${change === "defeated" ? "won" : "foe"}`, text);
+    const l = T().lines;
+    const template = { spawn: l.foeSpawn, grow: l.foeGrow, hit: l.foeHit, defeated: l.foeDefeated }[change];
+    line(`event ${change === "defeated" ? "won" : "foe"}`, fill(template, { foe: boss.name, n: boss.hp }));
   },
 };
 
@@ -414,7 +444,8 @@ function showGate() {
   $("gate-title").textContent = `Allow ${persona(req.crew).title} to ${VERBS[req.tool] ?? req.tool}?`;
   $("gate-detail").textContent = req.detail;
   $("gate-risk").hidden = !req.risky;
-  $("gate-eyebrow").textContent = req.risky ? "Operator check · high risk" : "Operator check";
+  $("gate-eyebrow").textContent = req.risky ? `${T().words.gate} · high risk` : T().words.gate;
+  $("gate-risk").textContent = T().lines.risky;
   $("gate-tool").textContent = TOOL_NAMES[req.tool] ?? req.tool;
   document.querySelector(".gate").classList.toggle("risky", req.risky);
   $("gate").hidden = false;
@@ -426,7 +457,7 @@ function answerGate(answer) {
   if (!next) return;
   api.approve(next.id, answer);
   if (answer === "always") line("note", `${persona(next.req.crew).title} may keep ${TOOL_NAMES[next.req.tool] ?? next.req.tool} without asking, for the rest of this session.`);
-  if (answer === "no") line("note", `Denied: ${next.req.summary}`);
+  if (answer === "no") line("note", `${T().lines.gateNo} ${next.req.summary}`);
   showGate();
 }
 
@@ -437,6 +468,7 @@ function setBusy(b) {
   $("prompt").disabled = b;
   $("send").disabled = b;
   document.querySelectorAll(".shortcut").forEach((c) => (c.disabled = b));
+  $("theme-picker").disabled = b;
   if (!b) $("prompt").focus();
 }
 
@@ -451,7 +483,9 @@ async function submit(raw) {
   scrollDown(true);
   setBusy(true);
   try {
+    const before = state.theme.id;
     state = await api.submit(text);
+    if (state.theme.id !== before) renderAll();
     renderTools();
     renderRank();
     renderStats();
@@ -494,6 +528,14 @@ function wire() {
   $("toggle-sound").addEventListener("click", () => void submit("/mute"));
   $("toggle-tts").addEventListener("click", () => void submit("/tts"));
   $("toggle-serious").addEventListener("click", () => void submit("/serious"));
+  $("theme-picker").addEventListener("change", (e) => {
+    const id = e.target.value;
+    if (busy || id === state.theme.id) {
+      e.target.value = state.theme.id;
+      return;
+    }
+    void submit(`/theme ${id}`);
+  });
   $("project").addEventListener("click", async () => {
     if (busy) return;
     const snap = await api.pickFolder();
@@ -521,8 +563,14 @@ function wire() {
 
 // ---------- start ----------
 
+function fillThemePicker() {
+  const pick = $("theme-picker");
+  pick.replaceChildren(...state.themes.map((t) => Object.assign(el("option", "", t.name), { value: t.id, title: t.tagline })));
+}
+
 async function main() {
   state = await api.init();
+  fillThemePicker();
   renderAll();
   wire();
   api.onEvent((name, payload) => handlers[name]?.(payload));

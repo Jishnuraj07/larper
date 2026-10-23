@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { CrewName } from "./config.js";
+import type { ThemeId } from "./theme/index.js";
 
 export interface TestResult {
   passed: number;
@@ -10,7 +11,10 @@ export interface TestResult {
 }
 
 export interface Boss {
+  /** The current theme's name for this tier. */
   name: string;
+  /** 0-3: how big the foe is, which the theme turns into a name. */
+  tier: number;
   hp: number;
   maxHp: number;
   startHp: number;
@@ -44,6 +48,7 @@ export interface EventMap {
   hack: Hack;
   boss: { boss: Boss | null; change: "spawn" | "hit" | "grow" | "defeated" | "none" };
   narration: { text: string };
+  theme: { id: ThemeId };
 }
 
 export type EventName = keyof EventMap;

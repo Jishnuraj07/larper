@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Bus, type EventMap } from "../src/events.js";
 import { findTool, READ_ONLY_TOOLS, runShell, toolParams, type ApprovalRequest, type ToolContext } from "../src/agent/tools.js";
 
-const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ambrosia-tools-")));
+const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "larper-tools-")));
 afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
 function write(rel: string, text: string) {
@@ -31,7 +31,7 @@ beforeEach(() => {
 function ctx(): ToolContext {
   return {
     root,
-    crew: "fabricator",
+    crew: "builder",
     bus,
     approve: async (req) => {
       asked.push(req);

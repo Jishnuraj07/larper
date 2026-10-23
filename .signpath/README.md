@@ -6,7 +6,7 @@ Windows releases are signed through the [SignPath Foundation](https://signpath.o
 
 1. **Apply** at <https://signpath.org/apply.html> with this repository's URL. Wait for approval.
 2. **Connect GitHub.** In SignPath, add this repository as a trusted build system (GitHub.com), and install the SignPath GitHub app on the repository when prompted.
-3. **Create the project** with the slug `ambrosia`, linked to this repository.
+3. **Create the project** with the slug `larper`, linked to this repository.
 4. **Add the artifact configuration** with the slug `installers`, and paste in [`artifact-configuration.xml`](artifact-configuration.xml).
 5. **Create the signing policy** with the slug `release-signing`, using the release certificate SignPath Foundation provides. Require manual approval, and make yourself the approver.
 6. **Create a CI user** in SignPath, give it submitter rights on the `release-signing` policy, and copy its API token.
@@ -17,10 +17,10 @@ Windows releases are signed through the [SignPath Foundation](https://signpath.o
 ## Releasing
 
 ```sh
-npm version 1.3.0 --no-git-tag-version   # bump the version
-git commit -am "Release 1.3.0"
-git tag v1.3.0
-git push origin main v1.3.0
+npm version 1.1.0 --no-git-tag-version   # bump the version
+git commit -am "Release 1.1.0"
+git tag v1.1.0
+git push origin main v1.1.0
 ```
 
 The [Release workflow](../.github/workflows/release.yml) then:

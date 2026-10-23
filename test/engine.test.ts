@@ -73,13 +73,13 @@ describe("GameEngine boss fights", () => {
 describe("GameEngine other hacks", () => {
   it("awards Bricked for an approved risky command that fails", () => {
     const { bus, hacks } = setup();
-    bus.emit("shell_result", { crew: "fabricator", command: "rm -rf x", exitCode: 1, risky: true, approved: true });
+    bus.emit("shell_result", { crew: "builder", command: "rm -rf x", exitCode: 1, risky: true, approved: true });
     expect(hacks()).toEqual(["bricked"]);
   });
 
   it("awards Firewall after three denials", () => {
     const { bus, hacks } = setup();
-    for (let i = 0; i < 3; i++) bus.emit("approval", { crew: "fabricator", tool: "shell", summary: "x", approved: false, risky: false });
+    for (let i = 0; i < 3; i++) bus.emit("approval", { crew: "builder", tool: "shell", summary: "x", approved: false, risky: false });
     expect(hacks()).toEqual(["firewall"]);
   });
 

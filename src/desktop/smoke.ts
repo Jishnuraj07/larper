@@ -2,12 +2,15 @@ import fs from "node:fs";
 import path from "node:path";
 import type { BrowserWindow } from "electron";
 import type { Session } from "../session.js";
+import { THEMES, fill, theme } from "../theme/index.js";
+import { hack } from "../game/hacks.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Drive the real window through the demo: type a task, answer the Operator check
- * by clicking, wait for the crew, then roast. Screenshots go to shotsDir if given.
+ * Drive the real window through the demo: type a task, answer the approval check
+ * by clicking, wait for the crew, then roast; then switch through every theme.
+ * Screenshots go to shotsDir if given.
  * Returns the process exit code.
  */
 export async function runDesktopSmoke({ win, session, shotsDir }: { win: BrowserWindow; session: Session; shotsDir?: string }): Promise<number> {
@@ -65,25 +68,39 @@ export async function runDesktopSmoke({ win, session, shotsDir }: { win: Browser
   await runTurn("/roast");
   await shot("4-roast");
 
+  const t = theme();
   const text = await js<string>("document.getElementById('transcript').innerText");
   const hacks = await js<string>("[...document.querySelectorAll('.hack-line')].map((e) => e.textContent).join(' | ')");
   const ring = await js<string>("document.getElementById('foe-name').textContent");
   // Transcript order: the threat must appear before it is purged, and the final reply after both.
   const order = (needle: string) => text.indexOf(needle);
+  const spawned = fill(t.lines.foeSpawn, { foe: t.threats[1], n: 2 });
+  const defeated = fill(t.lines.foeDefeated, { foe: t.threats[1], n: 0 });
   const checks: Array<[string, boolean]> = [
     ["bug fixed on disk", fs.readFileSync(path.join(session.root, "math.mjs"), "utf8").includes("a + b")],
     ["gate shown", gateShot],
-    ["threat appeared", /A (Bug|Daemon|Worm|Rogue AI) appears/.test(text)],
-    ["threat purged", text.includes("is purged")],
-    ["arena back to all clear", ring === "All clear" || ring.endsWith("purged")],
-    ["First Blood in transcript", hacks.includes("First Blood")],
-    ["Cracked the ICE earned", hacks.includes("Cracked the ICE")],
-    ["Fabricator replied", text.includes("Clean signal now")],
-    ["Pirate Radio narrated", (await js<number>("document.querySelectorAll('.radio').length")) > 0],
-    ["transcript in order", order("appears") < order("is purged") && order("is purged") < order("Clean signal now")],
-    ["rank shown as Runner", (await js<string>(`document.getElementById("rank-name").textContent`)) === "Runner"],
-    ["no renderer errors", errors.length === 0],
+    [`${t.words.foe} appeared`, text.includes(spawned)],
+    [`${t.words.foe} ${t.words.defeated}`, text.includes(defeated)],
+    ["arena back to all clear", ring === t.lines.allClear || ring.endsWith(t.words.defeated)],
+    [`${hack("first_blood").title} in transcript`, hacks.includes(hack("first_blood").title)],
+    [`${hack("cracked_ice").title} earned`, hacks.includes(hack("cracked_ice").title)],
+    [`${t.crew.builder.title} replied`, text.includes("Done and dusted")],
+    [`${t.crew.narrator.title} narrated`, (await js<number>("document.querySelectorAll('.radio').length")) > 0],
+    ["transcript in order", order(spawned) < order(defeated) && order(defeated) < order("Done and dusted")],
+    [`rank shown as ${t.ranks[1].name}`, (await js<string>(`document.getElementById("rank-name").textContent`)) === t.ranks[1].name],
   ];
+
+  // Every theme restyles the window and renames what is on it, progress and all.
+  const start = t.id;
+  for (const id of [...Object.keys(THEMES).filter((k) => k !== start), start]) {
+    await send(`/theme ${id}`);
+    await sleep(700);
+    const applied = await js<string>("document.documentElement.dataset.theme");
+    const rank = await js<string>(`document.getElementById("rank-name").textContent`);
+    checks.push([`switched to ${id}`, applied === id && rank === THEMES[id as keyof typeof THEMES].ranks[1].name]);
+    await shot(`5-theme-${id}`);
+  }
+  checks.push(["no renderer errors", errors.length === 0]);
   for (const e of errors) console.log(`renderer error: ${e}`);
   for (const [name, ok] of checks) console.log(`${ok ? "PASS" : "FAIL"}  ${name}`);
   return checks.every(([, ok]) => ok) ? 0 : 1;

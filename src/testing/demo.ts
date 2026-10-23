@@ -3,38 +3,41 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { CrewName } from "../config.js";
-import { PERSONAS } from "../agent/personas.js";
+import { THEMES } from "../theme/index.js";
 
 type ScriptedMessage = { stop_reason: string; content: Array<Record<string, unknown>> };
 
 /**
- * The demo session used by the smoke tests: Fabricator finds a failing test in
- * math.mjs, fixes `add`, and reruns; Black ICE approves. No API key needed.
+ * The demo session used by the smoke tests: the builder finds a failing test in
+ * math.mjs, fixes `add`, and reruns; the critic approves. No API key needed.
  */
 export function demoScripts(testCommand = "node --test"): Partial<Record<CrewName, ScriptedMessage[]>> {
   return {
-    fabricator: [
-      { stop_reason: "tool_use", content: [{ type: "text", text: "Let's see what's shorting out." }, { type: "tool_use", id: "h1", name: "run_tests", input: { command: testCommand } }] },
+    builder: [
+      { stop_reason: "tool_use", content: [{ type: "text", text: "Let's see what's broken." }, { type: "tool_use", id: "h1", name: "run_tests", input: { command: testCommand } }] },
       { stop_reason: "tool_use", content: [{ type: "tool_use", id: "h2", name: "read_file", input: { path: "math.mjs" } }] },
       { stop_reason: "tool_use", content: [{ type: "tool_use", id: "h3", name: "edit_file", input: { path: "math.mjs", old_string: "a - b", new_string: "a + b" } }] },
       { stop_reason: "tool_use", content: [{ type: "tool_use", id: "h4", name: "run_tests", input: { command: testCommand } }] },
-      { stop_reason: "end_turn", content: [{ type: "text", text: "Fixed: `add` subtracted instead of adding. All **3 tests** pass. Clean signal now." }] },
+      { stop_reason: "end_turn", content: [{ type: "text", text: "Fixed: `add` subtracted instead of adding. All **3 tests** pass. Done and dusted." }] },
     ],
-    blackice: [
+    critic: [
       { stop_reason: "end_turn", content: [{ type: "text", text: "A one-character fix. Someone alert the newsfeeds.\n\nNo real findings.\n\nVERDICT: APPROVED" }] },
     ],
   };
 }
 
-/** Which crew member a request is for, from the persona line that opens its system prompt. */
+/** Which crew member a request is for, from the persona line that opens its system prompt, in any theme. */
 function crewOf(system: unknown): CrewName | null {
   const text = typeof system === "string" ? system : "";
-  return Object.values(PERSONAS).find((p) => text.startsWith(`You are ${p.title},`))?.crew ?? null;
+  for (const t of Object.values(THEMES)) {
+    for (const [crew, skin] of Object.entries(t.crew)) if (text.startsWith(`You are ${skin.title},`)) return crew as CrewName;
+  }
+  return null;
 }
 
 /**
  * A stand-in for the SDK client that replays scripted replies per crew member.
- * Only the calls Ambrosia makes are implemented: beta streaming for the crew and
+ * Only the calls Larper makes are implemented: beta streaming for the crew and
  * messages.create for the narrator.
  */
 export function createScriptedClient(scripts: Partial<Record<CrewName, ScriptedMessage[]>>, delayMs = 150): Anthropic {
@@ -56,7 +59,7 @@ export function createScriptedClient(scripts: Partial<Record<CrewName, ScriptedM
             },
             async finalMessage() {
               await new Promise((r) => setTimeout(r, delayMs));
-              on.thinking?.("Tracing where the signal drops out…");
+              on.thinking?.("Tracing where the numbers go wrong…");
               for (const b of msg.content) if (b.type === "text") on.text?.(String(b.text));
               return { usage: { input_tokens: 1, output_tokens: 1 }, stop_details: null, ...msg };
             },
@@ -66,7 +69,7 @@ export function createScriptedClient(scripts: Partial<Record<CrewName, ScriptedM
     },
     messages: {
       async create() {
-        return { stop_reason: "end_turn", content: [{ type: "text", text: "Pirate Radio caught it all, and the whole sprawl is listening." }] };
+        return { stop_reason: "end_turn", content: [{ type: "text", text: "Caught it all, and everyone is listening." }] };
       },
     },
   };
@@ -87,7 +90,7 @@ test("adds negatives", () => assert.equal(add(-1, -1), -2));
 test("adds zero", () => assert.equal(add(0, 0), 0));
 `,
   );
-  execSync("git init -q && git add . && git -c user.email=demo@ambrosia -c user.name=demo commit -qm init", {
+  execSync("git init -q && git add . && git -c user.email=demo@larper -c user.name=demo commit -qm init", {
     cwd: dir,
     stdio: "ignore",
   });

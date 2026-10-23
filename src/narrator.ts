@@ -2,64 +2,44 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Bus } from "./events.js";
 import type { Config } from "./config.js";
 import { systemPrompt } from "./agent/personas.js";
+import { fill, theme, type NarrationKind } from "./theme/index.js";
 
-const TEMPLATES: Record<string, string[]> = {
-  spawn: [
-    "A {boss} just booted inside the test suite. {hp} hostile processes.",
-    "Heads up, sprawl: a {boss} with {hp} failing tests is jamming the signal.",
-  ],
-  grow: [
-    "Kill one process, two respawn. The {boss} now runs {hp}.",
-    "The {boss} is replicating. {hp} failures and climbing.",
-  ],
-  hit: ["Clean hit! The {boss} is down to {hp}.", "Packet lands. {hp} left on the {boss}."],
-  defeated: ["The {boss} is purged! The whole net lights up green.", "Green across the board. The {boss} is deleted."],
-  hack: ["New hack unlocked: {title}. The fixers are talking.", "{title}! Somebody spray that on a wall downtown."],
-  rank_up: ["New {rank} on the grid. Respect.", "The underground just bumped you to {rank}."],
-  denied: ["Operator says no. Paranoid, or smart? In this city, same thing."],
-  error: ["Signal dropped. Reboot and run it back."],
-  done: ["Fabricator powers down the rig. Job done.", "Job complete. Pirate Radio is putting it on the air."],
-};
-
-function pick(kind: string, vars: Record<string, string | number>): string {
-  const lines = TEMPLATES[kind] ?? TEMPLATES.done;
-  const line = lines[Math.floor(Math.random() * lines.length)];
-  return line.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
+function pick(kind: NarrationKind, vars: Record<string, string | number>): string {
+  const lines = theme().narration[kind] ?? theme().narration.done;
+  return fill(lines[Math.floor(Math.random() * lines.length)], vars);
 }
 
 const API_COOLDOWN_MS = 20_000;
 
 /**
- * Pirate Radio watches the bus and comments. Notable moments are batched; a line is
- * written by the cheap narrator model when one was not used recently, and from
- * templates otherwise (or when there is no API access).
+ * The narrator (Pirate Radio, Hermes, the Bard...) watches the bus and comments.
+ * Notable moments are batched; a line is written by the cheap narrator model when
+ * one was not used recently, and from the theme's templates otherwise (or when
+ * there is no API access).
  */
 export class Narrator {
   enabled = true;
   private log: string[] = [];
-  private template: { kind: string; vars: Record<string, string | number> } | null = null;
+  private template: { kind: NarrationKind; vars: Record<string, string | number> } | null = null;
   private timer: NodeJS.Timeout | null = null;
   private lastApi = 0;
-  private system: string;
 
   constructor(
     private bus: Bus,
     private client: Anthropic | null,
     private config: Config,
-    root: string,
+    private root: string,
   ) {
-    this.system = systemPrompt("radio", root);
-
     bus.on("edit", (e) => this.note(`edited ${e.path}`));
     bus.on("test_result", (r) => this.note(`ran tests: ${r.failed} failed, ${r.passed} passed`));
     bus.on("shell_result", (r) => r.approved && this.note(`ran \`${r.command.slice(0, 60)}\` (exit ${r.exitCode})`));
     bus.on("boss", ({ boss, change }) => {
       if (!boss || change === "none") return;
-      this.note(`threat ${change}: ${boss.name} at ${boss.hp}/${boss.maxHp} hp`);
+      this.note(`${theme().words.foe} ${change}: ${boss.name} at ${boss.hp}/${boss.maxHp} hp`);
       this.trigger(change, { boss: boss.name, hp: boss.hp }, change === "spawn" || change === "defeated");
     });
     bus.on("hack", (l) => {
-      this.note(`hack completed: ${l.title} (${l.description})`);
+      this.note(`${theme().words.achievement} earned: ${l.title} (${l.description})`);
       this.trigger("hack", { title: l.title }, true);
     });
     bus.on("rank_up", (r) => {
@@ -68,14 +48,14 @@ export class Narrator {
     });
     bus.on("approval", (a) => {
       if (a.approved) return;
-      this.note(`the user refused to let ${a.crew} run ${a.tool}: ${a.summary.slice(0, 60)}`);
+      this.note(`the user refused to let ${theme().crew[a.crew].title} run ${a.tool}: ${a.summary.slice(0, 60)}`);
       this.trigger("denied", {}, false);
     });
-    bus.on("review", (r) => this.note(`Black ICE ${r.approved ? "approved" : "rejected"} the work`));
+    bus.on("review", (r) => this.note(`${theme().crew.critic.title} ${r.approved ? "approved" : "rejected"} the work`));
     bus.on("error", () => this.trigger("error", {}, false));
     bus.on("turn_end", (t) => {
-      if (t.crew !== "fabricator" || t.stopReason !== "end_turn") return;
-      this.note("Fabricator finished the job");
+      if (t.crew !== "builder" || t.stopReason !== "end_turn") return;
+      this.note(`${theme().crew.builder.title} finished the ${theme().words.job}`);
       this.trigger("done", {}, true);
     });
   }
@@ -86,7 +66,7 @@ export class Narrator {
   }
 
   /** Schedule a line. `major` moments always get one; minor ones only sometimes. */
-  private trigger(kind: string, vars: Record<string, string | number>, major: boolean): void {
+  private trigger(kind: NarrationKind, vars: Record<string, string | number>, major: boolean): void {
     if (!this.enabled) return;
     if (!major && Math.random() < 0.5) return;
     // Keep the most dramatic template if several moments land together.
@@ -112,12 +92,12 @@ export class Narrator {
   }
 
   private async fromModel(events: string[]): Promise<string> {
-    const model = this.config.models.radio;
+    const model = this.config.models.narrator;
     try {
       const r = await this.client!.messages.create({
         model,
         max_tokens: 1024,
-        system: this.system,
+        system: systemPrompt("narrator", this.root),
         ...(model.startsWith("claude-haiku") ? {} : { output_config: { effort: "low" as const } }),
         messages: [{ role: "user", content: `What just happened:\n- ${events.join("\n- ")}` }],
       });

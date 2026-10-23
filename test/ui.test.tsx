@@ -2,7 +2,7 @@ import React from "react";
 import { renderToString } from "ink";
 import { describe, expect, it } from "vitest";
 import { BossBar, CrewBubble, HackCard, GatePrompt, StatusBar, ToolLine } from "../src/ui/components.js";
-import { HACKS } from "../src/game/hacks.js";
+import { hack } from "../src/game/hacks.js";
 
 const plain = (node: React.ReactElement) => renderToString(node, { columns: 100 }).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 
@@ -21,14 +21,14 @@ describe("UI components", () => {
   });
 
   it("BossBar draws one block per failing test", () => {
-    const out = plain(<BossBar boss={{ name: "Worm", hp: 2, maxHp: 5, startHp: 5 }} />);
+    const out = plain(<BossBar boss={{ name: "Worm", tier: 2, hp: 2, maxHp: 5, startHp: 5 }} />);
     expect(out).toContain("Worm");
     expect(out).toContain("██░░░");
     expect(out).toContain("2/5 failing");
   });
 
   it("GatePrompt names the crew and the action, and warns about risky ones", () => {
-    const req = { crew: "fabricator" as const, tool: "shell", summary: "rm -rf build", detail: "rm -rf build", risky: true };
+    const req = { crew: "builder" as const, tool: "shell", summary: "rm -rf build", detail: "rm -rf build", risky: true };
     const out = plain(<GatePrompt req={req} />);
     expect(out).toContain("Operator check: may Fabricator run a command?");
     expect(out).toContain("This one looks dangerous");
@@ -37,9 +37,9 @@ describe("UI components", () => {
   });
 
   it("CrewBubble, ToolLine and HackCard render their content", () => {
-    expect(plain(<CrewBubble crew="blackice" text="  Dreadful.  " />)).toMatch(/❄ Black ICE[\s\S]*Dreadful\./);
+    expect(plain(<CrewBubble crew="critic" text="  Dreadful.  " />)).toMatch(/❄ Black ICE[\s\S]*Dreadful\./);
     expect(plain(<ToolLine name="edit_file" summary="src/a.ts" ok={true} />)).toContain("✓ ⌨ edit_file src/a.ts");
     expect(plain(<ToolLine name="shell" summary="npm test" ok={false} result="boom" />)).toMatch(/✗[\s\S]*boom/);
-    expect(plain(<HackCard hack={HACKS.fork_bomb} />)).toMatch(/Fork Bomb Survivor[\s\S]*\+100 cred/);
+    expect(plain(<HackCard hack={hack("fork_bomb")} />)).toMatch(/Fork Bomb Survivor[\s\S]*\+100 cred/);
   });
 });

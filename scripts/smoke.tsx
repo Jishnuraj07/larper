@@ -1,11 +1,12 @@
 /**
  * End-to-end smoke test: renders the real UI against a scratch project.
- * Fabricator finds a failing test, fixes the bug and reruns; then Black ICE roasts
- * the diff. By default the models are scripted stand-ins, so no API key is
+ * The builder finds a failing test, fixes the bug and reruns; then the critic
+ * roasts the diff. By default the models are scripted stand-ins, so no API key is
  * needed. With --live it uses the real models (and costs a little).
  *
  *   npm run smoke
  *   npm run smoke -- --live
+ *   npm run smoke -- --theme=hustle     any theme; --theme=all runs each in turn
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -15,16 +16,33 @@ import React from "react";
 import { render } from "ink";
 
 const live = process.argv.includes("--live");
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "ambrosia-smoke-"));
-process.env.AMBROSIA_HOME = path.join(scratch, ".home");
+const themeArg = process.argv.find((a) => a.startsWith("--theme="))?.slice("--theme=".length);
+if (themeArg === "all") {
+  // One child per theme, so each starts from a clean slate.
+  const { spawnSync } = await import("node:child_process");
+  const { THEMES } = await import("../src/theme/index.js");
+  let failed = 0;
+  for (const id of Object.keys(THEMES)) {
+    console.log(`
+=== ${id} ===`);
+    const r = spawnSync(process.execPath, [...process.execArgv, process.argv[1], `--theme=${id}`, ...(live ? ["--live"] : [])], { stdio: "inherit" });
+    if (r.status !== 0) failed++;
+  }
+  process.exit(failed ? 1 : 0);
+}
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "larper-smoke-"));
+process.env.LARPER_HOME = path.join(scratch, ".home");
 const project = path.join(scratch, "project");
 
 const { Session } = await import("../src/session.js");
 const { App } = await import("../src/ui/App.js");
 const { createDemoProject, createScriptedClient, demoScripts } = await import("../src/testing/demo.js");
+const { BANNER } = await import("../src/ui/components.js");
+const { fill, theme } = await import("../src/theme/index.js");
+const { hack } = await import("../src/game/hacks.js");
 
 createDemoProject(project);
-const session = new Session({ root: project, mute: true, client: live ? undefined : createScriptedClient(demoScripts()) });
+const session = new Session({ root: project, mute: true, theme: themeArg, client: live ? undefined : createScriptedClient(demoScripts()) });
 let inputTokens = 0;
 let outputTokens = 0;
 session.bus.on("turn_end", (t) => {
@@ -77,19 +95,24 @@ app.unmount();
 
 const plain = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 // debug mode prints every frame; the last one holds the full transcript.
-const frames = plain.split(/(?=    _    __  __ ____)/);
-console.log(frames[frames.length - 1]);
+const frames = plain.split(BANNER[0]);
+console.log(BANNER[0] + frames[frames.length - 1]);
 
+// What the run should have printed, in the words of the theme it ran in.
+const t = theme();
+const flat = plain.replace(/\s+/g, " ");
+const said = (template: string) => t.threats.some((foe) => [1, 2, 3].some((n) => flat.includes(fill(template, { foe, n }))));
 const checks: Array<[string, boolean]> = [
+  [`ran as ${t.name}`, plain.includes(`${t.name} · `)],
   ["bug fixed on disk", fs.readFileSync(path.join(project, "math.mjs"), "utf8").includes("a + b")],
-  ["gate prompted", plain.includes("Operator check")],
-  ["threat spawned", /A (Bug|Daemon|Worm|Rogue AI) appears/.test(plain)],
-  ["threat purged", plain.includes("is purged")],
-  ["First Blood earned", plain.includes("First Blood")],
-  ...(live ? [] : [["Cracked the ICE earned", plain.includes("Cracked the ICE")] as [string, boolean]]),
+  ["gate prompted", plain.includes(t.words.gate)],
+  [`${t.words.foe} spawned`, said(t.lines.foeSpawn)],
+  [`${t.words.foe} ${t.words.defeated}`, said(t.lines.foeDefeated)],
+  [`${hack("first_blood").title} earned`, flat.includes(hack("first_blood").title)],
+  ...(live ? [] : [[`${hack("cracked_ice").title} earned`, flat.includes(hack("cracked_ice").title)] as [string, boolean]]),
   ["no errors", errors.length === 0],
-  ["Pirate Radio narrated", plain.includes("Radio:")],
-  ["profile saved", fs.existsSync(path.join(process.env.AMBROSIA_HOME!, "profile.json"))],
+  [`${t.crew.narrator.title} narrated`, plain.includes(`${t.crew.narrator.title}:`)],
+  ["profile saved", fs.existsSync(path.join(process.env.LARPER_HOME!, "profile.json"))],
 ];
 if (errors.length) console.log("Errors:\n" + errors.join("\n"));
 if (live) console.log(`Tokens: ~${inputTokens} in, ${outputTokens} out`);

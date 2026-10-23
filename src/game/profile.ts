@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ambrosiaHome } from "../config.js";
+import { larperHome } from "../config.js";
 import { LEGACY_HACK_IDS } from "./hacks.js";
 
 export interface Profile {
@@ -28,7 +28,7 @@ export function emptyProfile(): Profile {
 }
 
 function file(): string {
-  return path.join(ambrosiaHome(), "profile.json");
+  return path.join(larperHome(), "profile.json");
 }
 
 export function loadProfile(): Profile {
@@ -51,7 +51,7 @@ function migrateHacks(earned: Record<string, string>): Record<string, string> {
 
 export function saveProfile(p: Profile): void {
   try {
-    fs.mkdirSync(ambrosiaHome(), { recursive: true });
+    fs.mkdirSync(larperHome(), { recursive: true });
     const tmp = file() + ".tmp";
     fs.writeFileSync(tmp, JSON.stringify(p, null, 2));
     fs.renameSync(tmp, file());

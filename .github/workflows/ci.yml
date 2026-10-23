@@ -24,9 +24,9 @@ jobs:
       - run: npm test
       - run: npm run build
       - name: Built CLI starts
-        run: node bin/ambrosia.mjs --help
+        run: node bin/larper.mjs --help
       - name: End-to-end smoke test
-        run: npm run smoke
+        run: npm run smoke:themes
       - name: Desktop app smoke test
         if: runner.os == 'Windows'
         run: npx electron . --smoke --shots=shots

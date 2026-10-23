@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="netrunner">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ambrosia</title>
+    <title>Larper</title>
     <link rel="icon" href="../icon.svg" />
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -20,27 +20,32 @@
         <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" /></symbol>
         <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></symbol>
         <symbol id="i-cross" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" /></symbol>
+        <symbol id="i-mask" viewBox="0 0 24 24"><path d="M3.5 6.5c3-1.3 5.8-1.3 8.5 0 2.7-1.3 5.5-1.3 8.5 0v4.5c0 4.4-3.8 7.5-8.5 7.5S3.5 15.4 3.5 11z" /><path d="M7 10.5c.8-.7 2-.7 2.8 0M14.2 10.5c.8-.7 2-.7 2.8 0M9.5 14.5c1.5 1 3.5 1 5 0" /></symbol>
         <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9.5" rx="1.5" /><path d="M8.5 11V7.5a3.5 3.5 0 0 1 6.8-1.2" /><path d="M12 14.5v2.5" /></symbol>
       </defs>
     </svg>
 
     <header class="bar">
       <img class="mark" src="../icon.svg" alt="" />
-      <span class="wordmark">Ambrosia</span>
+      <span class="wordmark">Larper</span>
       <span id="demo-badge" class="demo" hidden>Demo</span>
       <button id="project" class="project" title="Choose another project folder">
         <svg class="ic"><use href="#i-folder" /></svg><span id="project-path">…</span>
       </button>
 
       <div id="rank" class="rank">
-        <span id="rank-name" class="rank-name">Script Kiddie</span>
+        <span id="rank-name" class="rank-name"></span>
         <div class="xp" aria-hidden="true"><div id="xp-fill" class="xp-fill"></div></div>
         <span id="xp-label" class="xp-label">0</span>
         <span id="xp-float" class="xp-float" aria-live="polite"></span>
       </div>
+      <label class="theme-pick" title="Theme">
+        <svg class="ic"><use href="#i-mask" /></svg>
+        <select id="theme-picker" aria-label="Theme"></select>
+      </label>
       <div class="tools">
         <button id="toggle-sound" class="tool-btn" title="Sound"><svg class="ic"><use href="#i-sound" /></svg></button>
-        <button id="toggle-tts" class="tool-btn" title="Pirate Radio reads its lines aloud"><svg class="ic"><use href="#i-voice" /></svg></button>
+        <button id="toggle-tts" class="tool-btn" title="The narrator reads its lines aloud"><svg class="ic"><use href="#i-voice" /></svg></button>
         <button id="toggle-serious" class="tool-btn" title="Serious mode: no game, no narration"><svg class="ic"><use href="#i-focus" /></svg></button>
       </div>
     </header>
@@ -50,8 +55,8 @@
         <div id="transcript" class="transcript" aria-live="polite">
           <div class="empty">
             <img class="empty-mark" src="../icon.svg" alt="" />
-            <p class="empty-title">What's the job?</p>
-            <p class="empty-sub">Fabricator takes the job. Failing tests boot up a hostile threat; every fix kills a process.</p>
+            <p id="empty-title" class="empty-title"></p>
+            <p id="empty-sub" class="empty-sub"></p>
           </div>
         </div>
 
@@ -70,7 +75,7 @@
             <button id="send" type="submit" class="send" title="Send (Enter)"><svg class="ic"><use href="#i-send" /></svg></button>
           </form>
           <div class="shortcuts">
-            <button type="button" class="shortcut" data-insert="/heist ">Heist</button>
+            <button type="button" id="plan-shortcut" class="shortcut" data-insert="/heist ">Heist</button>
             <button type="button" class="shortcut" data-run="/roast">Roast my diff</button>
             <button type="button" class="shortcut" data-run="/stats">Stats</button>
             <button type="button" class="shortcut" data-run="/clear">Clear memory</button>
@@ -86,13 +91,13 @@
             <circle id="ring-hp" class="ring-hp" cx="100" cy="100" r="84" />
           </svg>
           <div class="arena-center">
-            <div id="foe-name" class="foe-name">All clear</div>
-            <div id="foe-hp" class="foe-hp">No failing tests</div>
+            <div id="foe-name" class="foe-name"></div>
+            <div id="foe-hp" class="foe-hp"></div>
           </div>
         </section>
 
         <section class="rail-section">
-          <h2>Hacks <span id="hack-count" class="count"></span></h2>
+          <h2 id="hacks-title">Achievements <span id="hack-count" class="count"></span></h2>
           <ul id="hacks" class="hacks"></ul>
         </section>
 
@@ -105,7 +110,7 @@
 
     <div id="gate" class="veil" hidden>
       <div class="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title">
-        <p id="gate-eyebrow" class="gate-eyebrow">Operator check</p>
+        <p id="gate-eyebrow" class="gate-eyebrow"></p>
         <p id="gate-title" class="gate-title"></p>
         <p id="gate-risk" class="gate-risk" hidden>This command can delete or overwrite things. Check it carefully.</p>
         <pre id="gate-detail" class="gate-detail"></pre>
@@ -120,7 +125,7 @@
     <div id="upgrade" class="upgrade" hidden>
       <img class="upgrade-mark" src="../icon.svg" alt="" />
       <p id="upgrade-rank" class="upgrade-rank"></p>
-      <p class="upgrade-sub">Upgrade installed</p>
+      <p id="upgrade-sub" class="upgrade-sub"></p>
     </div>
 
     <script type="module" src="app.js"></script>
