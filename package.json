@@ -1,6 +1,6 @@
 {
   "name": "larper",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A coding-agent harness that plays dress-up: Claude as a crew in five switchable themes, from netrunners to Greek gods to a LinkedIn-style parody.",
   "scripts": {
     "start": "tsx src/cli.tsx",
