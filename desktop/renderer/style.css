@@ -871,6 +871,57 @@ kbd {
   clip-path: var(--cut);
 }
 
+.menu {
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  list-style: none;
+  background: rgb(var(--surface-rgb) / 0.96);
+  border: 1px solid var(--hair-hot);
+  clip-path: var(--cut-sm);
+}
+
+.menu-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 5px 14px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  font: 12.5px var(--mono-face);
+}
+
+.menu-row.on,
+.menu-row:hover {
+  background: var(--raised);
+  border-left-color: var(--neon);
+}
+
+.menu-name {
+  color: var(--text);
+}
+
+.menu-row.on .menu-name {
+  color: var(--neon);
+}
+
+.menu-args {
+  color: var(--faint);
+}
+
+.menu-about {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-family: var(--text-face);
+}
+
 .field:focus-within {
   border-color: var(--neon);
 }

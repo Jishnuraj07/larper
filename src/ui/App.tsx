@@ -6,7 +6,8 @@ import type { Boss, Hack } from "../events.js";
 import type { ApprovalRequest } from "../agent/tools.js";
 import type { ApprovalAnswer, Session } from "../session.js";
 import { fill, theme } from "../theme/index.js";
-import { Banner, BossBar, Flair, CrewBubble, HackCard, GatePrompt, RankUp, StatusBar, ToolLine, Working } from "./components.js";
+import { Banner, BossBar, CommandMenu, Flair, CrewBubble, HackCard, GatePrompt, RankUp, StatusBar, ToolLine, Working } from "./components.js";
+import { accept, completions, type Command } from "../commands.js";
 
 type Entry =
   | { id: number; kind: "banner" }
@@ -118,6 +119,9 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
   const [xp, setXp] = useState(session.engine.profile.xp);
   const [mode, setMode] = useState({ serious: session.serious, sound: session.sound, tts: session.tts });
   const [tick, setTick] = useState(0);
+  // The slash-command menu: which row is picked, and a key that remounts the input so its cursor lands at the end after a completion.
+  const [pick, setPick] = useState(0);
+  const [inputKey, setInputKey] = useState(0);
   const liveRef = useRef<Live | null>(null);
   const dirty = useRef(false);
   const toolSummaries = useRef(new Map<string, string>());
@@ -234,7 +238,31 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const menu = busy ? [] : completions(input);
+  const picked = Math.min(pick, menu.length - 1);
+
+  const edit = (v: string) => {
+    setInput(v);
+    setPick(0);
+  };
+  const complete = (c: Command) => {
+    edit(accept(c));
+    setInputKey((k) => k + 1);
+  };
+  // Enter on a half-typed command takes the picked one: it runs, or waits for its argument.
+  const enter = (v: string) => {
+    const c = completions(v)[picked];
+    if (!c || v === c.name) return void submit(v);
+    if (c.args) return complete(c);
+    void submit(c.name);
+  };
+
   useInput((ch, key) => {
+    if (menu.length && !approval) {
+      if (key.upArrow) return setPick((picked - 1 + menu.length) % menu.length);
+      if (key.downArrow) return setPick((picked + 1) % menu.length);
+      if (key.tab) return complete(menu[picked]);
+    }
     if (approval) {
       const c = ch.toLowerCase();
       const answer: ApprovalAnswer | null = c === "y" || key.return ? "yes" : c === "a" ? "always" : c === "n" || key.escape ? "no" : null;
@@ -270,9 +298,10 @@ export function App({ session, initialPrompt }: { session: Session; initialPromp
             <Text color={theme().colors.accent} bold>
               ›{" "}
             </Text>
-            <TextInput value={input} onChange={setInput} onSubmit={(v) => void submit(v)} placeholder={theme().lines.placeholder} />
+            <TextInput key={inputKey} value={input} onChange={edit} onSubmit={enter} placeholder={theme().lines.placeholder} />
           </Box>
         )}
+        {menu.length ? <CommandMenu items={menu} selected={picked} /> : null}
       </Box>
     </Box>
   );

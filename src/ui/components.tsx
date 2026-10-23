@@ -7,6 +7,7 @@ import type { ApprovalRequest } from "../agent/tools.js";
 import { persona, workingLine } from "../agent/personas.js";
 import { progress } from "../game/ranks.js";
 import { fill, theme } from "../theme/index.js";
+import type { Command } from "../commands.js";
 
 const DIM = "gray";
 
@@ -222,6 +223,28 @@ export function GatePrompt({ req }: { req: ApprovalRequest }) {
       <Text color={DIM}>
         [y] yes · [a] always allow {req.tool} this session · [n] no
       </Text>
+    </Box>
+  );
+}
+
+const MENU_ROWS = 8;
+
+/** The slash-command menu under the prompt. Scrolls to keep the selection in view. */
+export function CommandMenu({ items, selected }: { items: Command[]; selected: number }) {
+  const t = theme();
+  const start = Math.max(0, selected - MENU_ROWS + 1);
+  return (
+    <Box flexDirection="column">
+      {items.slice(start, start + MENU_ROWS).map((c, i) => {
+        const on = start + i === selected;
+        return (
+          <Text key={c.name} wrap="truncate-end" color={on ? t.colors.accent : undefined} bold={on}>
+            {on ? "▸ " : "  "}
+            {`${c.name}${c.args ? ` ${c.args}` : ""}`.padEnd(18)} <Text color={DIM}>{c.about}</Text>
+          </Text>
+        );
+      })}
+      <Text color={DIM}>{"  "}↑↓ choose · Tab complete · Enter run</Text>
     </Box>
   );
 }

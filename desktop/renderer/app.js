@@ -593,6 +593,7 @@ function setBusy(b) {
   $("send").disabled = b;
   document.querySelectorAll(".shortcut").forEach((c) => (c.disabled = b));
   $("theme-picker").disabled = b;
+  renderMenu();
   if (!b) $("prompt").focus();
 }
 
@@ -627,18 +628,94 @@ function autosize() {
   t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
 }
 
+// ---------- slash-command menu ----------
+
+let menu = []; // commands matching what is typed
+let picked = 0;
+
+/** Same rule as src/commands.ts: a bare "/word"; aliases only when nothing else matches. */
+function matches(line) {
+  if (!/^\/\S*$/.test(line)) return [];
+  const word = line.toLowerCase();
+  const hits = state.commands.filter((c) => !c.alias && c.name.startsWith(word));
+  return hits.length ? hits : state.commands.filter((c) => c.alias && c.name.startsWith(word));
+}
+
+function renderMenu() {
+  menu = busy ? [] : matches($("prompt").value);
+  picked = Math.min(picked, Math.max(menu.length - 1, 0));
+  const list = $("menu");
+  list.hidden = !menu.length;
+  list.replaceChildren(
+    ...menu.map((c, i) => {
+      const row = el("li", i === picked ? "menu-row on" : "menu-row");
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", String(i === picked));
+      row.append(el("span", "menu-name", c.name), el("span", "menu-args", c.args ?? ""), el("span", "menu-about", c.about));
+      // mousedown, not click, so the textarea keeps focus.
+      row.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        picked = i;
+        enter();
+      });
+      return row;
+    }),
+  );
+  list.querySelector(".on")?.scrollIntoView({ block: "nearest" });
+}
+
+function complete(c) {
+  $("prompt").value = c.args ? `${c.name} ` : c.name;
+  picked = 0;
+  autosize();
+  renderMenu();
+}
+
+/** Enter: a half-typed command takes the picked one, which runs or waits for its argument. */
+function enter() {
+  const v = $("prompt").value;
+  const c = menu[picked];
+  if (!c || v.trim() === c.name) return void submit(v);
+  if (c.args) return complete(c);
+  void submit(c.name);
+}
+
 function wire() {
   $("form").addEventListener("submit", (e) => {
     e.preventDefault();
     void submit($("prompt").value);
   });
   $("prompt").addEventListener("keydown", (e) => {
+    if (menu.length) {
+      const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+      if (step) {
+        e.preventDefault();
+        picked = (picked + step + menu.length) % menu.length;
+        return renderMenu();
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        return complete(menu[picked]);
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        menu = [];
+        $("menu").hidden = true;
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      void submit($("prompt").value);
+      enter();
     }
   });
-  $("prompt").addEventListener("input", autosize);
+  $("prompt").addEventListener("input", () => {
+    autosize();
+    picked = 0;
+    renderMenu();
+  });
+  $("prompt").addEventListener("blur", () => ($("menu").hidden = true));
+  $("prompt").addEventListener("focus", renderMenu);
   document.querySelectorAll(".shortcut").forEach((b) =>
     b.addEventListener("click", () => {
       if (b.dataset.run) void submit(b.dataset.run);

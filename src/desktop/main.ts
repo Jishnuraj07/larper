@@ -21,6 +21,7 @@ import { allHacks } from "../game/hacks.js";
 import { ranks } from "../game/ranks.js";
 import { personas } from "../agent/personas.js";
 import { THEMES } from "../theme/index.js";
+import { commandList } from "../commands.js";
 import { createDemoProject, createScriptedClient, demoScripts } from "../testing/demo.js";
 import { runDesktopSmoke } from "./smoke.js";
 
@@ -119,6 +120,7 @@ export function snapshot() {
     boss: s.engine.boss,
     theme: s.theme,
     themes: Object.values(THEMES).map((t) => ({ id: t.id, name: t.name, tagline: t.tagline })),
+    commands: commandList(),
     ranks: ranks(),
     personas: personas(),
     hacks: allHacks().map((h) => ({ ...h, earned: Boolean(p.hacks[h.id]) })),

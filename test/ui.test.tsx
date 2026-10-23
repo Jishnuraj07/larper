@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToString } from "ink";
 import { describe, expect, it } from "vitest";
-import { BossBar, CrewBubble, HackCard, GatePrompt, StatusBar, ToolLine } from "../src/ui/components.js";
+import { BossBar, CommandMenu, CrewBubble, HackCard, GatePrompt, StatusBar, ToolLine } from "../src/ui/components.js";
 import { hack } from "../src/game/hacks.js";
 
 const plain = (node: React.ReactElement) => renderToString(node, { columns: 100 }).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
@@ -41,5 +41,18 @@ describe("UI components", () => {
     expect(plain(<ToolLine name="edit_file" summary="src/a.ts" ok={true} />)).toContain("✓ ⌨ edit_file src/a.ts");
     expect(plain(<ToolLine name="shell" summary="npm test" ok={false} result="boom" />)).toMatch(/✗[\s\S]*boom/);
     expect(plain(<HackCard hack={hack("fork_bomb")} />)).toMatch(/Fork Bomb Survivor[\s\S]*\+100 cred/);
+  });
+});
+
+describe("CommandMenu", () => {
+  it("marks the picked command and scrolls it into view", () => {
+    const items = Array.from({ length: 12 }, (_, i) => ({ name: `/c${i}`, about: `does ${i}` }));
+    const top = plain(<CommandMenu items={items} selected={1} />);
+    expect(top).toContain("▸ /c1");
+    expect(top).toContain("/c7");
+    expect(top).not.toContain("/c8");
+    const bottom = plain(<CommandMenu items={items} selected={11} />);
+    expect(bottom).toContain("▸ /c11");
+    expect(bottom).not.toContain("/c3 ");
   });
 });

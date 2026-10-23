@@ -92,6 +92,19 @@ export async function runDesktopSmoke({ win, session, shotsDir }: { win: Browser
     [`rank shown as ${t.ranks[1].name}`, (await js<string>(`document.getElementById("rank-name").textContent`)) === t.ranks[1].name],
   ];
 
+  // Typing a slash opens the command menu; arrows pick, Tab completes.
+  const key = (k: string) => js(`document.getElementById("prompt").dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true }))`);
+  await js(`(() => { const p = document.getElementById("prompt"); p.focus(); p.value = "/h"; p.dispatchEvent(new Event("input")); })()`);
+  await shot("4b-menu");
+  const rows = await js<string[]>(`[...document.querySelectorAll("#menu .menu-name")].map((e) => e.textContent)`);
+  await key("ArrowDown");
+  await key("ArrowDown");
+  await key("Tab");
+  const completed = await js<string>(`document.getElementById("prompt").value`);
+  const narrowed = await js<string>(`document.getElementById("menu").innerText`);
+  await js(`document.getElementById("prompt").value = ""`);
+  checks.push(["command menu completes", rows.join(" ") === `/${t.words.plan} /${t.words.achievements} /help` && completed === "/help" && narrowed.trim().startsWith("/help") && !narrowed.includes("/heist")]);
+
   // Every theme restyles the window and renames what is on it, progress and all.
   const start = t.id;
   for (const id of [...Object.keys(THEMES).filter((k) => k !== start), start]) {

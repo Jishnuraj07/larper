@@ -73,8 +73,9 @@
               <button id="stop" class="stop" title="Stop (Esc)"><svg class="ic"><use href="#i-stop" /></svg>Stop</button>
             </div>
           </div>
+          <ul id="menu" class="menu" role="listbox" aria-label="Commands" hidden></ul>
           <form id="form" class="field">
-            <textarea id="prompt" rows="1" placeholder="Describe a task, or type / for commands"></textarea>
+            <textarea id="prompt" rows="1" aria-controls="menu" placeholder="Describe a task, or type / for commands"></textarea>
             <button id="send" type="submit" class="send" title="Send (Enter)"><svg class="ic"><use href="#i-send" /></svg></button>
           </form>
           <div class="shortcuts">

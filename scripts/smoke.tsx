@@ -91,6 +91,18 @@ await type("/roast");
 await waitIdle();
 await type("/stats");
 await sleep(300);
+// The slash menu: "/h" lists /heist, /hacks, /help; two downs and Tab land on /help, Enter runs it.
+for (const ch of "/h") {
+  stdin.write(ch);
+  await sleep(20);
+}
+await sleep(100);
+const menuShown = output.includes("↑↓ choose");
+for (const k of ["\x1b[B", "\x1b[B", "\t", "\r"]) {
+  stdin.write(k);
+  await sleep(100);
+}
+await sleep(300);
 app.unmount();
 
 const plain = output.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
@@ -111,6 +123,7 @@ const checks: Array<[string, boolean]> = [
   [`${hack("first_blood").title} earned`, flat.includes(hack("first_blood").title)],
   ...(live ? [] : [[`${hack("cracked_ice").title} earned`, flat.includes(hack("cracked_ice").title)] as [string, boolean]]),
   ["no errors", errors.length === 0],
+  ["slash menu completed /help", menuShown && plain.includes("Esc interrupts the crew mid-job.")],
   [`${t.crew.narrator.title} narrated`, plain.includes(`${t.crew.narrator.title}:`)],
   ["profile saved", fs.existsSync(path.join(process.env.LARPER_HOME!, "profile.json"))],
 ];
