@@ -1,6 +1,6 @@
 {
   "name": "larper",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A coding-agent harness that plays dress-up: Claude as a crew in five switchable themes, from netrunners to Greek gods to a LinkedIn-style parody.",
   "scripts": {
     "start": "tsx src/cli.tsx",
@@ -16,7 +16,14 @@
     "smoke:desktop": "npm run build && electron . --smoke --shots=shots",
     "package:desktop": "npm run build && electron-builder"
   },
-  "keywords": ["claude", "coding-agent", "cli", "electron", "themes", "gamification"],
+  "keywords": [
+    "claude",
+    "coding-agent",
+    "cli",
+    "electron",
+    "themes",
+    "gamification"
+  ],
   "author": "jishnuneoz",
   "license": "ISC",
   "type": "module",
