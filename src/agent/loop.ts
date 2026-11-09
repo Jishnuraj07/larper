@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Bus } from "../events.js";
 import type { Config, CrewName } from "../config.js";
-import { providerOf } from "../providers.js";
+import { featuresOf } from "../providers.js";
 import { systemPrompt } from "./personas.js";
 import { findTool, toolParams, type ApprovalRequest, type ToolContext } from "./tools.js";
 
@@ -24,19 +24,6 @@ export interface AgentOptions {
 export interface RunResult {
   text: string;
   stopReason: string | null;
-}
-
-/** Models with adaptive thinking, effort and server-side refusal fallbacks. */
-function isModern(model: string): boolean {
-  return /^claude-(opus|sonnet|fable|mythos)-5/.test(model);
-}
-
-/**
- * Served by DeepSeek's Anthropic-compatible endpoint. It takes adaptive thinking and
- * effort, ignores cache_control (it caches on its own), and has no betas or fallbacks.
- */
-function isDeepSeek(model: string): boolean {
-  return providerOf(model) === "deepseek";
 }
 
 /**
@@ -62,30 +49,19 @@ export class Agent {
   }
 
   private params(): Anthropic.Beta.MessageCreateParamsNonStreaming {
-    const model = this.model;
-    const modern = isModern(model);
-    const deepseek = isDeepSeek(model);
+    // Per model family and provider: see featuresOf in src/providers.ts.
+    const f = featuresOf(this.model);
     return {
-      model,
-      max_tokens: modern || deepseek ? 64_000 : 16_000,
+      model: f.model,
+      max_tokens: f.maxTokens,
       // Rebuilt each time: switching themes mid-session changes the voice, not the history.
       system: systemPrompt(this.crew, this.opts.root),
       messages: this.messages,
-      cache_control: { type: "ephemeral" },
+      ...(f.cache ? { cache_control: { type: "ephemeral" as const } } : {}),
       ...(this.tools.length ? { tools: this.tools } : {}),
-      ...(modern
-        ? {
-            thinking: { type: "adaptive", display: "summarized" },
-            output_config: { effort: this.opts.config.effort[this.crew] },
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-          }
-        : deepseek
-          ? {
-              thinking: { type: "adaptive" },
-              output_config: { effort: this.opts.config.effort[this.crew] },
-            }
-          : {}),
+      ...(f.thinking ? { thinking: f.summarize ? { type: "adaptive", display: "summarized" } : { type: "adaptive" } } : {}),
+      ...(f.effort ? { output_config: { effort: this.opts.config.effort[this.crew] } } : {}),
+      ...(f.fallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
     };
   }
 
@@ -229,7 +205,7 @@ function firstLine(s: string): string {
 
 export function describeError(err: unknown): string {
   if (err instanceof Anthropic.AuthenticationError) {
-    return "Access denied: authentication failed. Set ANTHROPIC_API_KEY or run `ant auth login` (DEEPSEEK_API_KEY for deepseek-* models).";
+    return "Access denied: authentication failed. Check ANTHROPIC_API_KEY (or `ant auth login`), DEEPSEEK_API_KEY or OPENCODE_API_KEY, whichever this model uses.";
   }
   if (err instanceof Anthropic.RateLimitError) return "Rate limited. Try again shortly.";
   if (err instanceof Anthropic.BadRequestError) return `Bad request: ${err.message}`;

@@ -20,6 +20,10 @@ export interface Config {
   workspaceId?: string;
   /** Override DeepSeek's Anthropic-compatible endpoint. DEEPSEEK_BASE_URL overrides it. */
   deepseekBaseUrl?: string;
+  /** Override OpenCode Zen's endpoint. OPENCODE_BASE_URL overrides it. */
+  opencodeBaseUrl?: string;
+  /** Override OpenCode Go's endpoint. OPENCODE_GO_BASE_URL overrides it. */
+  opencodeGoBaseUrl?: string;
 }
 
 export const DEFAULT_CONFIG: Config = {

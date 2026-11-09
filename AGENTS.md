@@ -27,8 +27,8 @@ Before you call a change done, run `npm run check`. CI runs on Ubuntu and Window
 |---|---|
 | `src/cli.tsx`, `bin/larper.mjs` | Entry point and flag parsing. `bin` runs `dist/` when it exists, otherwise `src/` through tsx. |
 | `src/session.ts` | Everything behind the UI: builds the clients and the crew, approvals, slash commands, the narrator and the sound. |
-| `src/providers.ts` | Picks a provider per model (`anthropic` or `deepseek`) and builds one SDK client per provider. |
-| `src/config.ts` | `~/.larper/config.json`: models and effort per role, theme, sound, `autoApprove`, `workspaceId`, `deepseekBaseUrl`. Also the Ambrosia migration. |
+| `src/providers.ts` | Picks a provider per model name, strips routing prefixes, decides what each model is sent (`featuresOf`), and builds one SDK client per provider. |
+| `src/config.ts` | `~/.larper/config.json`: models and effort per role, theme, sound, `autoApprove`, `workspaceId`, and the provider endpoint overrides. Also the Ambrosia migration. |
 | `src/agent/loop.ts` | `Agent`: the streaming tool-use loop for one crew member, plus the per-model request parameters. |
 | `src/agent/tools.ts` | Tool definitions (zod schemas). `READ_ONLY_TOOLS` never ask for approval. |
 | `src/agent/safety.ts` | `confine()` keeps paths inside the project root. `isRisky()` flags dangerous commands. |
@@ -56,18 +56,26 @@ Before you call a change done, run `npm run check`. CI runs on Ubuntu and Window
 
 Each role (`builder`, `planner`, `critic`, `narrator`) names its model in config. `providerOf(model)` routes it:
 
-| Prefix | Provider | Endpoint | Key |
+| Model name | Provider | Endpoint (override: env var, then config key) | Key |
 |---|---|---|---|
-| `deepseek-` | DeepSeek | `https://api.deepseek.com/anthropic`, overridden by `DEEPSEEK_BASE_URL` and then by `deepseekBaseUrl` in config | `DEEPSEEK_API_KEY` |
+| `opencode/<id>` | OpenCode Zen | `https://opencode.ai/inference/anthropic` (`OPENCODE_BASE_URL`, `opencodeBaseUrl`) | `OPENCODE_API_KEY` |
+| `opencode-go/<id>` | OpenCode Go | `https://opencode.ai/inference/go/anthropic` (`OPENCODE_GO_BASE_URL`, `opencodeGoBaseUrl`) | `OPENCODE_API_KEY` |
+| `deepseek-*` | DeepSeek | `https://api.deepseek.com/anthropic` (`DEEPSEEK_BASE_URL`, `deepseekBaseUrl`) | `DEEPSEEK_API_KEY` |
 | anything else | Anthropic | the SDK default | `ANTHROPIC_API_KEY`, `ant auth login`, and so on; `ANTHROPIC_WORKSPACE_ID` / `workspaceId` |
 
-DeepSeek speaks the Anthropic Messages API, so one SDK and one loop serve both providers. The request parameters differ per model family (see `Agent.params()` in `src/agent/loop.ts`):
+Every provider speaks the Anthropic Messages API, so one SDK and one loop serve them all. `wireModel()` strips the `opencode/` and `opencode-go/` prefixes before a request goes out. OpenCode models served only over OpenAI- or Gemini-style APIs aren't supported. Those would need a second loop.
 
-- **Claude 5 models (Opus, Sonnet, Fable, Mythos):** 64k `max_tokens`, adaptive thinking with summarized display, `output_config.effort`, the server-side fallback beta and `fallbacks: "default"`.
-- **DeepSeek (`deepseek-flash`, `deepseek-v4-pro`):** 64k `max_tokens`, adaptive thinking (DeepSeek treats it as enabled), `output_config.effort`. No `betas` and no `fallbacks`. DeepSeek ignores `cache_control` and `is_error` on tool results.
-- **Older or smaller Claude models (Haiku):** 16k `max_tokens`, no thinking, no effort.
+`featuresOf(model)` decides what each request carries, and both `Agent.params()` and the narrator use it:
 
-If a role's provider has no credentials, the session reports it once and the crew stays offline. A request is never sent to the wrong provider. To add a provider, extend `Provider` / `providerOf` / `Clients` in `src/providers.ts`, add a branch in `Agent.params()`, and add tests in `test/providers.test.ts` and `test/loop.test.ts`.
+- **Claude 5 (Opus, Sonnet, Fable, Mythos):** 64k `max_tokens`, adaptive thinking with summarized display, `output_config.effort`, top-level `cache_control`. Sent straight to Anthropic, they also get the server-side fallback beta and `fallbacks: "default"`. Through a gateway they don't, because gateways get only the stable API.
+- **DeepSeek:** 64k, adaptive thinking (no display option), effort. No caching field (DeepSeek caches on its own), no betas.
+- **Everything else (Haiku, older Claude, Qwen and others on OpenCode):** 16k, no thinking, no effort. `cache_control` goes to Claude models only.
+
+Foreign clients never forward the Anthropic bearer token, and they send `User-Agent: larper/<version>`. OpenCode clients send their key both as `x-api-key` and as a Bearer token. OpenCode Go also gets a stable `x-opencode-session` per `Clients` instance (one per session).
+
+If a role's provider has no key, the session reports it once and the crew stays offline. A request is never sent to the wrong provider. Never reuse consumer subscription logins (for example a Claude Pro/Max OAuth token stored by another tool) as API credentials.
+
+To add a provider: extend `Provider`, `providerOf`, `KEY_VARS` and `Clients.build` in `src/providers.ts`, adjust `featuresOf` if the provider needs it, and add tests in `test/providers.test.ts` and `test/loop.test.ts`.
 
 The Anthropic default models live in `DEFAULT_CONFIG` (`src/config.ts`). Use current model IDs and don't add date suffixes.
 

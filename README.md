@@ -78,6 +78,21 @@ Any role can run on DeepSeek instead of Claude. Set `DEEPSEEK_API_KEY`, then giv
 
 Models whose names start with `deepseek-` go to DeepSeek's Anthropic-compatible endpoint (`https://api.deepseek.com/anthropic`). Everything else goes to Anthropic, so you can run some roles on each. To use a different endpoint, set `DEEPSEEK_BASE_URL` or `deepseekBaseUrl` in config. If every role is on DeepSeek, you don't need an Anthropic key.
 
+### OpenCode models
+
+Roles can also run through [OpenCode Zen](https://opencode.ai/docs/zen/) (pay as you go) or [OpenCode Go](https://opencode.ai/docs/go/) (subscription) with your OpenCode API key. Set `OPENCODE_API_KEY`, then prefix the model with `opencode/` for Zen or `opencode-go/` for Go:
+
+```json
+"models": {
+  "builder": "opencode/claude-opus-5-5",
+  "planner": "opencode/claude-opus-5-5",
+  "critic": "opencode-go/qwen3.8-flash",
+  "narrator": "opencode-go/claude-haiku-5-5"
+}
+```
+
+Larper talks to OpenCode's Anthropic-compatible endpoint, so only models served there work: Claude and Qwen on Zen; Claude Haiku, Qwen and MiniMax on Go. Models that OpenCode serves only over OpenAI- or Gemini-style APIs (GPT, Gemini, Kimi, GLM and others) aren't supported yet. For DeepSeek, use the `deepseek-*` models above. OpenCode's free models only work inside OpenCode. To use a different endpoint, set `OPENCODE_BASE_URL` / `OPENCODE_GO_BASE_URL` or `opencodeBaseUrl` / `opencodeGoBaseUrl` in config.
+
 ## Desktop app
 
 The desktop app has the same crew in a window. It has the crew chat, an arena where foes take hits, a rank bar, an achievements board, a theme picker, and approvals as a dialog. Each theme brings its own look:
@@ -121,7 +136,7 @@ Flags: `--theme <name>`, `--serious`, `--mute`, `--yolo` (approve everything; ca
 
 ## Config
 
-`~/.larper/config.json` is written on first run. It sets the `theme`, plus each role's model and effort (keys `builder`, `planner`, `critic`, `narrator`), sound, tts, the narrator, `autoApprove` (tools that never ask for approval), `workspaceId` (for keys not scoped to a workspace) and `deepseekBaseUrl`. Your progress lives in `~/.larper/profile.json`. Set `LARPER_HOME` to keep them somewhere else.
+`~/.larper/config.json` is written on first run. It sets the `theme`, plus each role's model and effort (keys `builder`, `planner`, `critic`, `narrator`), sound, tts, the narrator, `autoApprove` (tools that never ask for approval), `workspaceId` (for keys not scoped to a workspace), and the provider endpoints `deepseekBaseUrl`, `opencodeBaseUrl` and `opencodeGoBaseUrl`. Your progress lives in `~/.larper/profile.json`. Set `LARPER_HOME` to keep them somewhere else.
 
 Coming from Ambrosia: on first run, Larper copies your config and progress over from `~/.ambrosia/`. Crew keys under either old naming (`hephaestus`/`athena`/`momus`/`hermes` or `fabricator`/`strategos`/`blackice`/`radio`) are read and mapped to the new roles. Achievements earned under the old ids are kept.
 
@@ -165,7 +180,7 @@ Windows releases are meant to be signed through [SignPath.io](https://about.sign
 
 ### Privacy
 
-Larper sends your prompts to the [Anthropic API](https://www.anthropic.com/legal/privacy) using your own API key, or to the [DeepSeek API](https://www.deepseek.com) for any role you've set to a `deepseek-*` model. File contents and command output that the crew reads while working go with them. Those are the only network connections it makes. There is no telemetry, analytics or auto-update. Your config and progress stay on your machine in `~/.larper/`.
+Larper sends your prompts to the [Anthropic API](https://www.anthropic.com/legal/privacy) using your own API key, or to [DeepSeek](https://www.deepseek.com) or [OpenCode](https://opencode.ai) for any role you've set to one of their models. File contents and command output that the crew reads while working go with them. Those are the only network connections it makes. There is no telemetry, analytics or auto-update. Your config and progress stay on your machine in `~/.larper/`.
 
 ## License
 

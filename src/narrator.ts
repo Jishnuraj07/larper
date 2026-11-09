@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Bus } from "./events.js";
 import type { Config } from "./config.js";
 import { systemPrompt } from "./agent/personas.js";
+import { featuresOf } from "./providers.js";
 import { fill, theme, type NarrationKind } from "./theme/index.js";
 
 function pick(kind: NarrationKind, vars: Record<string, string | number>): string {
@@ -92,14 +93,13 @@ export class Narrator {
   }
 
   private async fromModel(events: string[]): Promise<string> {
-    const model = this.config.models.narrator;
+    const f = featuresOf(this.config.models.narrator);
     try {
       const r = await this.client!.messages.create({
-        model,
+        model: f.model,
         max_tokens: 1024,
         system: systemPrompt("narrator", this.root),
-        // Haiku takes no effort setting; DeepSeek and the larger Claude models do.
-        ...(model.startsWith("claude-haiku") ? {} : { output_config: { effort: "low" as const } }),
+        ...(f.effort ? { output_config: { effort: "low" as const } } : {}),
         messages: [{ role: "user", content: `What just happened:\n- ${events.join("\n- ")}` }],
       });
       if (r.stop_reason === "refusal") return "";

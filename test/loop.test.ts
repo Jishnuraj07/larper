@@ -145,4 +145,14 @@ describe("Agent loop", () => {
     expect(requests[0].betas).toBeUndefined();
     expect(requests[0].fallbacks).toBeUndefined();
   });
+
+  it("sends gateway models their bare id, without Anthropic's betas", async () => {
+    const { client, requests } = fakeClient([{ stop_reason: "end_turn", content: [{ type: "text", text: "hi" }] }]);
+    const config = { ...DEFAULT_CONFIG, models: { ...DEFAULT_CONFIG.models, builder: "opencode/claude-opus-5-5" } };
+    const agent = new Agent({ crew: "builder", client, config, root, bus: new Bus(), approve: async () => true });
+    await agent.run("build");
+    expect(requests[0]).toMatchObject({ model: "claude-opus-5-5", thinking: { type: "adaptive" }, output_config: { effort: "high" } });
+    expect(requests[0].betas).toBeUndefined();
+    expect(requests[0].fallbacks).toBeUndefined();
+  });
 });

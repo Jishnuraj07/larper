@@ -181,7 +181,7 @@ export class Session {
   private async task(fn: (p: Crew, signal: AbortSignal) => Promise<unknown>): Promise<void> {
     if (!this.crew) {
       this.bus.emit("error", {
-        message: "No API access. Set ANTHROPIC_API_KEY (or run `ant auth login`), or DEEPSEEK_API_KEY for deepseek-* models, and restart.",
+        message: "No API access. Set the key for your crew's models (ANTHROPIC_API_KEY or `ant auth login`, DEEPSEEK_API_KEY, OPENCODE_API_KEY) and restart.",
       });
       return;
     }
