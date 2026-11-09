@@ -63,6 +63,21 @@ npm link                                 # optional: puts `larper` on your PATH
 
 Run it from inside the project you want to work on, or point it there with `--cwd <dir>`.
 
+### DeepSeek models
+
+Any role can run on DeepSeek instead of Claude. Set `DEEPSEEK_API_KEY`, then give the role a `deepseek-*` model in `~/.larper/config.json`:
+
+```json
+"models": {
+  "builder": "deepseek-v4-pro",
+  "planner": "deepseek-v4-pro",
+  "critic": "deepseek-flash",
+  "narrator": "deepseek-flash"
+}
+```
+
+Models whose names start with `deepseek-` go to DeepSeek's Anthropic-compatible endpoint (`https://api.deepseek.com/anthropic`). Everything else goes to Anthropic, so you can run some roles on each. To use a different endpoint, set `DEEPSEEK_BASE_URL` or `deepseekBaseUrl` in config. If every role is on DeepSeek, you don't need an Anthropic key.
+
 ## Desktop app
 
 The desktop app has the same crew in a window. It has the crew chat, an arena where foes take hits, a rank bar, an achievements board, a theme picker, and approvals as a dialog. Each theme brings its own look:
@@ -106,7 +121,7 @@ Flags: `--theme <name>`, `--serious`, `--mute`, `--yolo` (approve everything; ca
 
 ## Config
 
-`~/.larper/config.json` is written on first run. It sets the `theme`, plus each role's model and effort (keys `builder`, `planner`, `critic`, `narrator`), sound, tts, the narrator, `autoApprove` (tools that never ask for approval), and `workspaceId` (for keys not scoped to a workspace). Your progress lives in `~/.larper/profile.json`. Set `LARPER_HOME` to keep them somewhere else.
+`~/.larper/config.json` is written on first run. It sets the `theme`, plus each role's model and effort (keys `builder`, `planner`, `critic`, `narrator`), sound, tts, the narrator, `autoApprove` (tools that never ask for approval), `workspaceId` (for keys not scoped to a workspace) and `deepseekBaseUrl`. Your progress lives in `~/.larper/profile.json`. Set `LARPER_HOME` to keep them somewhere else.
 
 Coming from Ambrosia: on first run, Larper copies your config and progress over from `~/.ambrosia/`. Crew keys under either old naming (`hephaestus`/`athena`/`momus`/`hermes` or `fabricator`/`strategos`/`blackice`/`radio`) are read and mapped to the new roles. Achievements earned under the old ids are kept.
 
@@ -150,7 +165,7 @@ Windows releases are meant to be signed through [SignPath.io](https://about.sign
 
 ### Privacy
 
-Larper sends your prompts to the [Anthropic API](https://www.anthropic.com/legal/privacy) using your own API key. File contents and command output that the crew reads while working go with them. That is the only network connection it makes. There is no telemetry, analytics or auto-update. Your config and progress stay on your machine in `~/.larper/`.
+Larper sends your prompts to the [Anthropic API](https://www.anthropic.com/legal/privacy) using your own API key, or to the [DeepSeek API](https://www.deepseek.com) for any role you've set to a `deepseek-*` model. File contents and command output that the crew reads while working go with them. Those are the only network connections it makes. There is no telemetry, analytics or auto-update. Your config and progress stay on your machine in `~/.larper/`.
 
 ## License
 

@@ -14,6 +14,7 @@ import { progress } from "./game/ranks.js";
 import { streak } from "./game/profile.js";
 import { THEMES, fill, findTheme, setTheme, theme, type Theme } from "./theme/index.js";
 import { Narrator } from "./narrator.js";
+import { Clients, providerOf } from "./providers.js";
 import { play } from "./audio/earcons.js";
 import { speak, stopSpeaking } from "./audio/tts.js";
 
@@ -41,7 +42,6 @@ export class Session {
   tts: boolean;
   busy = false;
 
-  private client: Anthropic | null = null;
   private crew: Crew | null = null;
   private narrator: Narrator;
   private abort: AbortController | null = null;
@@ -62,23 +62,32 @@ export class Session {
     if (opts.theme && !asked) queueMicrotask(() => this.bus.emit("notice", { text: `No theme called "${opts.theme}". ${themeList()}` }));
     for (const t of [...READ_ONLY_TOOLS, ...this.config.autoApprove]) this.alwaysAllow.add(t);
 
-    if (opts.client) {
-      this.client = opts.client;
-    } else {
+    // An injected client (the demo, tests) serves every model; otherwise each model's provider does.
+    const clients = opts.client ? null : new Clients(this.config);
+    const failed = new Set<string>();
+    const clientFor = (model: string): Anthropic | null => {
+      if (opts.client) return opts.client;
       try {
-        // Keys not scoped to a workspace must name one on every request.
-        const workspace = process.env.ANTHROPIC_WORKSPACE_ID ?? this.config.workspaceId;
-        this.client = new Anthropic(workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {});
+        return clients!.for(model);
       } catch (err) {
-        this.client = null;
-        queueMicrotask(() => this.bus.emit("error", { message: describeError(err) }));
+        // Say it once per provider, not once per crew member.
+        const message = describeError(err);
+        if (!failed.has(message)) queueMicrotask(() => this.bus.emit("error", { message }));
+        failed.add(message);
+        return null;
       }
-    }
+    };
+    const agentClients = {
+      builder: clientFor(this.config.models.builder),
+      planner: clientFor(this.config.models.planner),
+      critic: clientFor(this.config.models.critic),
+    };
 
-    if (this.client) {
+    // Without a client for every role, the crew stays off duty; the error above says why.
+    if (agentClients.builder && agentClients.planner && agentClients.critic) {
       const approve = (req: ApprovalRequest) => this.approve(req);
-      const make = (crew: "builder" | "planner" | "critic", tools?: string[]) =>
-        new Agent({ crew, client: this.client!, config: this.config, root: this.root, bus: this.bus, approve, tools });
+      const make = (crew: keyof typeof agentClients, tools?: string[]) =>
+        new Agent({ crew, client: agentClients[crew]!, config: this.config, root: this.root, bus: this.bus, approve, tools });
       this.crew = {
         builder: make("builder"),
         planner: make("planner", READ_ONLY_TOOLS),
@@ -87,12 +96,13 @@ export class Session {
     }
 
     this.engine = new GameEngine(this.bus, loadProfile());
-    this.narrator = new Narrator(this.bus, this.client, this.config, this.root);
+    this.narrator = new Narrator(this.bus, clientFor(this.config.models.narrator), this.config, this.root);
     this.applyMode();
     this.wireSound();
     this.engine.startSession();
     if (this.sound && !this.serious) play("start");
-    if (!opts.client && !hasCredentials()) {
+    const usesAnthropic = Object.values(this.config.models).some((m) => providerOf(m) === "anthropic");
+    if (!opts.client && usesAnthropic && !hasCredentials()) {
       queueMicrotask(() =>
         this.bus.emit("notice", {
           text: "⚠ No Anthropic credentials found. Set ANTHROPIC_API_KEY (or run `ant auth login`) before handing the crew a job.",
@@ -171,7 +181,7 @@ export class Session {
   private async task(fn: (p: Crew, signal: AbortSignal) => Promise<unknown>): Promise<void> {
     if (!this.crew) {
       this.bus.emit("error", {
-        message: "No API access. Set ANTHROPIC_API_KEY (or run `ant auth login`) and restart.",
+        message: "No API access. Set ANTHROPIC_API_KEY (or run `ant auth login`), or DEEPSEEK_API_KEY for deepseek-* models, and restart.",
       });
       return;
     }

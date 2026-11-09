@@ -98,6 +98,7 @@ export class Narrator {
         model,
         max_tokens: 1024,
         system: systemPrompt("narrator", this.root),
+        // Haiku takes no effort setting; DeepSeek and the larger Claude models do.
         ...(model.startsWith("claude-haiku") ? {} : { output_config: { effort: "low" as const } }),
         messages: [{ role: "user", content: `What just happened:\n- ${events.join("\n- ")}` }],
       });

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Bus } from "../events.js";
 import type { Config, CrewName } from "../config.js";
+import { providerOf } from "../providers.js";
 import { systemPrompt } from "./personas.js";
 import { findTool, toolParams, type ApprovalRequest, type ToolContext } from "./tools.js";
 
@@ -31,6 +32,14 @@ function isModern(model: string): boolean {
 }
 
 /**
+ * Served by DeepSeek's Anthropic-compatible endpoint. It takes adaptive thinking and
+ * effort, ignores cache_control (it caches on its own), and has no betas or fallbacks.
+ */
+function isDeepSeek(model: string): boolean {
+  return providerOf(model) === "deepseek";
+}
+
+/**
  * One crew member's conversation. The history is append-only (never edited), which keeps
  * the prompt cache warm and replayed thinking blocks valid.
  */
@@ -55,9 +64,10 @@ export class Agent {
   private params(): Anthropic.Beta.MessageCreateParamsNonStreaming {
     const model = this.model;
     const modern = isModern(model);
+    const deepseek = isDeepSeek(model);
     return {
       model,
-      max_tokens: modern ? 64_000 : 16_000,
+      max_tokens: modern || deepseek ? 64_000 : 16_000,
       // Rebuilt each time: switching themes mid-session changes the voice, not the history.
       system: systemPrompt(this.crew, this.opts.root),
       messages: this.messages,
@@ -70,7 +80,12 @@ export class Agent {
             betas: ["server-side-fallback-2026-07-01"],
             fallbacks: "default",
           }
-        : {}),
+        : deepseek
+          ? {
+              thinking: { type: "adaptive" },
+              output_config: { effort: this.opts.config.effort[this.crew] },
+            }
+          : {}),
     };
   }
 
@@ -214,7 +229,7 @@ function firstLine(s: string): string {
 
 export function describeError(err: unknown): string {
   if (err instanceof Anthropic.AuthenticationError) {
-    return "Access denied: authentication failed. Set ANTHROPIC_API_KEY or run `ant auth login`.";
+    return "Access denied: authentication failed. Set ANTHROPIC_API_KEY or run `ant auth login` (DEEPSEEK_API_KEY for deepseek-* models).";
   }
   if (err instanceof Anthropic.RateLimitError) return "Rate limited. Try again shortly.";
   if (err instanceof Anthropic.BadRequestError) return `Bad request: ${err.message}`;

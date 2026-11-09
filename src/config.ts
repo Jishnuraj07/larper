@@ -18,6 +18,8 @@ export interface Config {
   autoApprove: string[];
   /** For API keys not scoped to a workspace. ANTHROPIC_WORKSPACE_ID overrides it. */
   workspaceId?: string;
+  /** Override DeepSeek's Anthropic-compatible endpoint. DEEPSEEK_BASE_URL overrides it. */
+  deepseekBaseUrl?: string;
 }
 
 export const DEFAULT_CONFIG: Config = {

@@ -130,4 +130,19 @@ describe("Agent loop", () => {
     expect(requests[0].fallbacks).toBeUndefined();
     expect(requests[0].tools).toBeUndefined();
   });
+
+  it("sends DeepSeek models adaptive thinking and effort, but no Anthropic betas or fallbacks", async () => {
+    const { client, requests } = fakeClient([{ stop_reason: "end_turn", content: [{ type: "text", text: "hi" }] }]);
+    const config = { ...DEFAULT_CONFIG, models: { ...DEFAULT_CONFIG.models, builder: "deepseek-v4-pro" } };
+    const agent = new Agent({ crew: "builder", client, config, root, bus: new Bus(), approve: async () => true });
+    await agent.run("build");
+    expect(requests[0]).toMatchObject({
+      model: "deepseek-v4-pro",
+      max_tokens: 64_000,
+      thinking: { type: "adaptive" },
+      output_config: { effort: "high" },
+    });
+    expect(requests[0].betas).toBeUndefined();
+    expect(requests[0].fallbacks).toBeUndefined();
+  });
 });
